@@ -212,6 +212,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
       phone: ''
     },
     emergencyCircle: [],
+    avatarUrl: '',
     profileCompletionPct: 0
   },
   privacy: {
@@ -252,6 +253,7 @@ export function loadSettings(): AppSettings {
     }
     const parsed = JSON.parse(raw);
     const mergedProfile = { ...DEFAULT_SETTINGS.profile, ...(parsed.profile || {}) };
+    mergedProfile.avatarUrl = parsed?.profile?.avatarUrl || '';
     mergedProfile.allergies = Array.isArray(mergedProfile.allergies) 
       ? mergedProfile.allergies 
       : (DEFAULT_SETTINGS.profile.allergies || []);
@@ -392,6 +394,12 @@ export function useUserSettings() {
             name: primary.name,
             phone: primary.phone,
             relation: primary.relation || 'Emergency Contact'
+          };
+        } else if (!profilePartial.emergencyContact) {
+          mergedProfile.emergencyContact = {
+            name: '',
+            relation: '',
+            phone: ''
           };
         }
       }

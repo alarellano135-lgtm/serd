@@ -94,7 +94,13 @@ export default function Contacts({ onNavigate }: ContactsProps) {
               phone: primaryContact.phone,
               relation: primaryContact.relation || 'Emergency Contact'
             }
-          } : {})
+          } : {
+            emergencyContact: {
+              name: '',
+              phone: '',
+              relation: ''
+            }
+          })
         });
       } catch (err) {
         console.warn('Failed to sync contacts to cloud profile:', err);

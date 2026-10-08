@@ -448,14 +448,31 @@ export default function SignUp({ onNavigate }: SignUpProps) {
         weightKg: parseInteger(weightInput, 70),
         allergies: finalAllergies,
         role: 'citizen' as const,
-        ...(contactName.trim() ? {
-          emergencyContact: {
+        emergencyContact: contactName.trim() ? {
+          name: contactName.trim(),
+          relation: contactRelation.trim() || 'Emergency Contact',
+          phone: contactPhone.trim()
+        } : {
+          name: '',
+          relation: '',
+          phone: ''
+        },
+        emergencyCircle: contactName.trim() ? [
+          {
+            id: `c-prim-${Date.now()}`,
             name: contactName.trim(),
+            phone: contactPhone.trim(),
             relation: contactRelation.trim() || 'Emergency Contact',
-            phone: contactPhone.trim()
+            isPrimary: true
           }
-        } : {})
+        ] : [],
+        avatarUrl: ''
       };
+
+      // Wipe any leftover data from previous accounts before saving this new user's state
+      try {
+        localStorage.removeItem('serd_app_settings');
+      } catch {}
 
       // Update local profile state
       updateStoredProfile(profilePayload);

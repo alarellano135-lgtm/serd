@@ -295,7 +295,7 @@ function ImageCropperModal({ imageSrc, onApplyCrop, onCancel }: ImageCropperModa
 // ============================================================================
 export default function Profile({ onNavigate }: ProfileProps) {
   const { settings, updateProfile } = useUserSettings();
-  const { logout, currentUser } = useAuth();
+  const { logout, currentUser, userProfile } = useAuth();
   const { profile, location, darkMode } = settings;
 
   // View state
@@ -320,8 +320,10 @@ export default function Profile({ onNavigate }: ProfileProps) {
   const [formContactRelation, setFormContactRelation] = useState(profile.emergencyContact?.relation || '');
   const [formContactPhone, setFormContactPhone] = useState(profile.emergencyContact?.phone || '');
 
+  const effectiveAvatarUrl = userProfile?.avatarUrl !== undefined ? (userProfile.avatarUrl || '') : (profile.avatarUrl || '');
+
   // Photo & Cropper State
-  const [avatarPreview, setAvatarPreview] = useState<string>(profile.avatarUrl || '');
+  const [avatarPreview, setAvatarPreview] = useState<string>(effectiveAvatarUrl);
   const [cropperRawSrc, setCropperRawSrc] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -374,10 +376,10 @@ export default function Profile({ onNavigate }: ProfileProps) {
       setFormContactName(profile.emergencyContact?.name || '');
       setFormContactRelation(profile.emergencyContact?.relation || '');
       setFormContactPhone(profile.emergencyContact?.phone || '');
-      setAvatarPreview(profile.avatarUrl || '');
+      setAvatarPreview(effectiveAvatarUrl);
       setPhotoError(null);
     }
-  }, [isEditModalOpen, profile]);
+  }, [isEditModalOpen, profile, effectiveAvatarUrl]);
 
   // Safe data fallbacks to prevent undefined access crashes
   const allergies = Array.isArray(profile?.allergies) ? profile.allergies : [];
@@ -386,9 +388,10 @@ export default function Profile({ onNavigate }: ProfileProps) {
     : (profile?.chronicConditions ? [String(profile.chronicConditions)] : ['None Reported']);
   const emergencyContact = profile?.emergencyContact || {
     name: '',
-    relation: 'Primary Contact',
+    relation: '',
     phone: ''
   };
+  const hasEmergencyContact = Boolean(emergencyContact.name?.trim());
 
   const completionPct = typeof profile?.profileCompletionPct === 'number' 
     ? profile.profileCompletionPct 
@@ -486,13 +489,15 @@ export default function Profile({ onNavigate }: ProfileProps) {
       address: formAddress.trim(),
       avatarUrl: avatarPreview,
       allergies: profile.allergies || [],
-      ...(formContactName.trim() ? {
-        emergencyContact: {
-          name: formContactName.trim(),
-          relation: formContactRelation.trim() || 'Primary Contact',
-          phone: formContactPhone.trim()
-        }
-      } : {})
+      emergencyContact: formContactName.trim() ? {
+        name: formContactName.trim(),
+        relation: formContactRelation.trim() || 'Primary Contact',
+        phone: formContactPhone.trim()
+      } : {
+        name: '',
+        relation: '',
+        phone: ''
+      }
     };
 
     // Update locally
@@ -608,7 +613,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
       `Height: ${profile?.heightCm || 182} cm | Weight: ${profile?.weightKg || 72} kg`,
       `Medical Conditions: ${chronicConditions.length > 0 ? chronicConditions.join(', ') : 'None reported'}`,
       `Allergies: ${allergies.length > 0 ? allergies.map(a => `${a.allergen}${a.reaction ? ` (${a.reaction})` : ''}`).join(', ') : 'No known allergies'}`,
-      `Emergency Contact: ${emergencyContact.name} (${emergencyContact.relation}) - ${emergencyContact.phone}`
+      hasEmergencyContact 
+        ? `Emergency Contact: ${emergencyContact.name} (${emergencyContact.relation || 'Emergency Contact'}) - ${emergencyContact.phone || 'N/A'}`
+        : 'Emergency Contact: None registered'
     ];
     navigator.clipboard?.writeText(lines.join('\n'));
     setCopiedPass(true);
@@ -663,9 +670,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
         <div className="flex items-center min-w-0 mr-3">
           {/* Avatar with photo or default icon */}
           <div className="relative w-12 h-12 sm:w-14 sm:h-14 bg-[#F9E8EC] dark:bg-rose-950/50 rounded-2xl flex items-center justify-center mr-3.5 sm:mr-4 shrink-0 group-hover:scale-105 transition-transform overflow-hidden border border-rose-200/50 dark:border-rose-900/30">
-            {profile.avatarUrl ? (
+            {effectiveAvatarUrl ? (
               <img 
-                src={profile.avatarUrl} 
+                src={effectiveAvatarUrl} 
                 alt={profile.fullName} 
                 className="w-full h-full object-cover"
               />
@@ -775,19 +782,38 @@ export default function Profile({ onNavigate }: ProfileProps) {
 
       {/* Primary Emergency Contact */}
       <div className={`${darkMode ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-gray-100'} p-5 rounded-2xl border shadow-2xs`}>
-        <p className="text-gray-400 text-[10px] uppercase font-bold tracking-wider mb-2">Emergency Contact</p>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-sm">{emergencyContact.name}</p>
-            <p className="text-xs text-gray-500 dark:text-neutral-400">{emergencyContact.relation}</p>
-          </div>
-          <a 
-            href={`tel:${emergencyContact.phone}`}
-            className="font-mono text-xs font-semibold text-[#B41A46] dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 px-3 py-1.5 rounded-lg hover:underline"
-          >
-            {emergencyContact.phone}
-          </a>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-gray-400 text-[10px] uppercase font-bold tracking-wider">Emergency Contact</p>
+          {!hasEmergencyContact && (
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
+              className="text-xs font-semibold text-[#B41A46] dark:text-rose-400 hover:underline cursor-pointer"
+            >
+              + Add Contact
+            </button>
+          )}
         </div>
+        {hasEmergencyContact ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-sm">{emergencyContact.name}</p>
+              <p className="text-xs text-gray-500 dark:text-neutral-400">{emergencyContact.relation || 'Emergency Contact'}</p>
+            </div>
+            {emergencyContact.phone ? (
+              <a 
+                href={`tel:${emergencyContact.phone}`}
+                className="font-mono text-xs font-semibold text-[#B41A46] dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 px-3 py-1.5 rounded-lg hover:underline"
+              >
+                {emergencyContact.phone}
+              </a>
+            ) : null}
+          </div>
+        ) : (
+          <div className="py-1">
+            <p className="text-xs text-gray-400 dark:text-neutral-500 italic">No emergency contact registered</p>
+          </div>
+        )}
       </div>
 
       {/* Account & Session Actions */}
@@ -1230,20 +1256,30 @@ export default function Profile({ onNavigate }: ProfileProps) {
                   <span className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 block">
                     Emergency Contact
                   </span>
-                  <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 mt-0.5">
-                    {emergencyContact.name}
-                  </p>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                    {emergencyContact.relation}
-                  </p>
+                  {hasEmergencyContact ? (
+                    <>
+                      <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 mt-0.5">
+                        {emergencyContact.name}
+                      </p>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        {emergencyContact.relation || 'Emergency Contact'}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-neutral-400 dark:text-neutral-500 italic mt-0.5">
+                      None registered
+                    </p>
+                  )}
                 </div>
-                <a
-                  href={`tel:${emergencyContact.phone}`}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-medium hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors shadow-2xs"
-                >
-                  <PhoneCall className="w-3.5 h-3.5 text-[#B41A46] dark:text-rose-400" />
-                  <span>Call</span>
-                </a>
+                {hasEmergencyContact && emergencyContact.phone ? (
+                  <a
+                    href={`tel:${emergencyContact.phone}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-medium hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors shadow-2xs"
+                  >
+                    <PhoneCall className="w-3.5 h-3.5 text-[#B41A46] dark:text-rose-400" />
+                    <span>Call</span>
+                  </a>
+                ) : null}
               </div>
             </div>
 

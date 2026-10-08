@@ -11,7 +11,7 @@ import {
   User,
   FirestoreUserProfile
 } from '../lib/firebase';
-import { updateStoredProfile } from '../lib/userSettings';
+import { updateStoredProfile, saveSettings, DEFAULT_SETTINGS } from '../lib/userSettings';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -51,8 +51,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               birthdate: profile.birthdate || '1998-01-01',
               heightCm: profile.heightCm || 175,
               weightKg: profile.weightKg || 70,
-              ...(profile.emergencyContact ? { emergencyContact: profile.emergencyContact } : {}),
-              ...(Array.isArray(profile.emergencyCircle) ? { emergencyCircle: profile.emergencyCircle } : {})
+              emergencyContact: profile.emergencyContact || { name: '', relation: '', phone: '' },
+              emergencyCircle: Array.isArray(profile.emergencyCircle) ? profile.emergencyCircle : [],
+              avatarUrl: profile.avatarUrl || ''
             });
           }
         } catch (err) {
@@ -96,6 +97,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (profile) {
         setUserProfile(profile);
+        updateStoredProfile({
+          fullName: profile.fullName || cred.user.displayName || (cred.user.email ? cred.user.email.split('@')[0] : 'Citizen'),
+          displayName: profile.displayName || cred.user.displayName || (cred.user.email ? cred.user.email.split('@')[0] : 'Citizen'),
+          email: profile.email || cred.user.email || '',
+          bloodType: profile.bloodType || 'O+',
+          birthdate: profile.birthdate || '1998-01-01',
+          heightCm: profile.heightCm || 175,
+          weightKg: profile.weightKg || 70,
+          emergencyContact: profile.emergencyContact || { name: '', relation: '', phone: '' },
+          emergencyCircle: Array.isArray(profile.emergencyCircle) ? profile.emergencyCircle : [],
+          avatarUrl: profile.avatarUrl || ''
+        });
       }
       return { success: true, profile };
     } catch (err: any) {
@@ -132,7 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...(profileData.station ? { station: profileData.station } : {}),
         ...(profileData.vehicleUnit ? { vehicleUnit: profileData.vehicleUnit } : {}),
         ...(profileData.callSign ? { callSign: profileData.callSign } : {}),
-        ...(profileData.avatarUrl ? { avatarUrl: profileData.avatarUrl } : {})
+        avatarUrl: profileData.avatarUrl || ''
       };
 
       await syncUserProfileToFirestore(newProfile);
@@ -166,6 +179,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(null);
     try {
       localStorage.removeItem('serd_current_user_role');
+      localStorage.removeItem('serd_app_settings');
+      sessionStorage.removeItem('serd_real_user_location');
+      localStorage.removeItem('serd_real_user_location');
+      saveSettings(DEFAULT_SETTINGS);
     } catch {}
   };
 
