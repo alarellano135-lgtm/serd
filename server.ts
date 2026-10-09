@@ -112,6 +112,23 @@ async function startServer() {
       io.emit("call-ended", data);
     });
 
+    // Real-time two-way tactical incident messaging
+    socket.on("send-incident-message", (data) => {
+      if (data && data.incidentId) {
+        if (!incidentMessages[data.incidentId]) incidentMessages[data.incidentId] = [];
+        const msg = {
+          id: data.message?.id || "msg-" + Date.now(),
+          sender: data.message?.sender || "citizen",
+          senderName: data.message?.senderName || "User",
+          text: data.message?.text || "",
+          timestamp: data.message?.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isUrgent: Boolean(data.message?.isUrgent)
+        };
+        incidentMessages[data.incidentId].push(msg);
+        io.emit("incident-message", { incidentId: data.incidentId, message: msg });
+      }
+    });
+
     // Citizen initiates an emergency call request
     socket.on("request-call", (data) => {
       socket.broadcast.emit("incoming-call", {

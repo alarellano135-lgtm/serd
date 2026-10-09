@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { Phone } from 'lucide-react';
 import { Screen } from '../types';
 import { useUserSettings } from '../lib/userSettings';
 import { createEmergencyIncident } from '../lib/api';
@@ -153,7 +152,7 @@ export default function Home({ onSOSClick, onChatClick, onNavigate }: HomeProps)
               isHolding ? 'scale-95' : 'hover:scale-105 active:scale-95'
             }`}
           >
-            <Phone className="w-10 h-10 text-white fill-current" />
+            <span className="text-white font-black text-2xl tracking-widest select-none">SOS</span>
           </div>
         </div>
 

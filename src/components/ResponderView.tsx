@@ -1,38 +1,15 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  LogOut, 
-  MapPin, 
-  Phone, 
-  AlertTriangle, 
-  Check, 
-  Shield, 
-  CornerUpRight, 
-  ChevronRight, 
-  Heart,
-  MessageSquare,
-  Send,
-  Radio,
-  Navigation,
-  Bell,
-  Flame,
-  Siren,
-  Stethoscope,
-  X,
-  RefreshCw,
-  LocateFixed,
-  Volume2,
-  VolumeX,
-  Layers
-} from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { io, Socket } from 'socket.io-client';
 import { 
   calculateRealRoute, 
+  calculateDistance,
   formatDistance, 
   formatEta, 
   RouteResult 
 } from '../lib/routing';
+import { GpsFilter } from '../lib/gpsFilter';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserSettings } from '../lib/userSettings';
 import { useWebRTC } from '../contexts/WebRTCContext';
@@ -116,11 +93,24 @@ const hospitalMarkerIcon = L.divIcon({
   iconAnchor: [0, 0]
 });
 
-// Map View Controller
+// Map View Controller with Damped Pan Smoothing
 function MapAutoCenter({ center }: { center: [number, number] }) {
   const map = useMap();
+  const lastCenterRef = useRef<[number, number] | null>(null);
+
   useEffect(() => {
-    map.panTo(center, { animate: true, duration: 0.8 });
+    if (!center || (center[0] === 0 && center[1] === 0)) return;
+    if (!lastCenterRef.current) {
+      lastCenterRef.current = center;
+      map.setView(center, map.getZoom());
+      return;
+    }
+    // Only smooth-pan if distance moved is greater than 10 meters, preventing micro-pan stutter
+    const dist = calculateDistance(lastCenterRef.current[0], lastCenterRef.current[1], center[0], center[1]);
+    if (dist >= 10) {
+      lastCenterRef.current = center;
+      map.panTo(center, { animate: true, duration: 1.0, easeLinearity: 0.25 });
+    }
   }, [center, map]);
   return null;
 }
@@ -237,24 +227,46 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
 
   // Socket connection for real-time WebSocket CAD events
   const socketRef = useRef<Socket | null>(null);
+  const activeIncidentRef = useRef<FirestoreIncident | null>(activeIncident);
+  activeIncidentRef.current = activeIncident;
+  const isMessagesOpenRef = useRef<boolean>(isMessagesOpen);
+  isMessagesOpenRef.current = isMessagesOpen;
 
-  // 1. Initialize Real GPS Geolocation Listener
+  // GPS Kalman & Outlier Suppression Filter (suppresses ±500m cell-tower bounces)
+  const gpsFilterRef = useRef<GpsFilter>(new GpsFilter({
+    maxAcceptableAccuracy: 65,     // Discard inaccurate cell-tower fixes > 65m
+    maxPlausibleSpeedMps: 45,      // ~162 km/h vehicle speed ceiling
+    stationaryThresholdMeters: 2.5, // Deadband to stop micro-jitter when stopped
+    smoothingFactor: 0.35          // Adaptive Exponential Moving Average
+  }));
+
+  // 1. Initialize Real GPS Geolocation Listener with Kalman Outlier Filtering
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('geolocation' in navigator)) return;
 
+    if (deviceGpsCoords) {
+      gpsFilterRef.current.reset(deviceGpsCoords);
+    }
+
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setDeviceGpsCoords([lat, lng]);
-        setGpsAccuracy(Math.round(pos.coords.accuracy));
-        setIsGpsActive(true);
+        const filtered = gpsFilterRef.current.update(pos);
+        setDeviceGpsCoords(filtered.coords);
+        setGpsAccuracy(filtered.accuracy);
+        setIsGpsActive(filtered.isReliable);
+
+        if (filtered.isReliable) {
+          try {
+            sessionStorage.setItem('serd_real_user_location', JSON.stringify(filtered.coords));
+            localStorage.setItem('serd_real_user_location', JSON.stringify(filtered.coords));
+          } catch {}
+        }
       },
       (err) => {
         console.info('[Responder GPS] Notice:', err.message);
         setIsGpsActive(false);
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 3000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
@@ -313,14 +325,37 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
     });
 
     socket.on('incident-message', (data: { incidentId: string; message: IncidentChatMessage }) => {
-      if (activeIncident && activeIncident.id === data.incidentId) {
-        setMessages(prev => [...prev, data.message]);
-        if (!isMessagesOpen) {
+      const currentInc = activeIncidentRef.current;
+      if (currentInc && (currentInc.id === data.incidentId || !data.incidentId)) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === data.message.id)) return prev;
+          return [...prev, data.message];
+        });
+        if (!isMessagesOpenRef.current) {
           setUnreadCount(c => c + 1);
           setIncomingMessageBanner(data.message);
           playChime(880, 1174.66);
-          setTimeout(() => setIncomingMessageBanner(null), 5000);
+          setTimeout(() => setIncomingMessageBanner(null), 6000);
         }
+      } else if (!currentInc) {
+        // Hydrate incident if not yet set
+        fetchIncidents().then((list) => {
+          if (list && list.length > 0) {
+            const found = list.find(i => i.id === data.incidentId) || list[0];
+            setActiveIncident(found as FirestoreIncident);
+            setLiveIncidents(list as FirestoreIncident[]);
+            setMessages(prev => {
+              if (prev.some(m => m.id === data.message.id)) return prev;
+              return [...prev, data.message];
+            });
+            if (!isMessagesOpenRef.current) {
+              setUnreadCount(c => c + 1);
+              setIncomingMessageBanner(data.message);
+              playChime(880, 1174.66);
+              setTimeout(() => setIncomingMessageBanner(null), 6000);
+            }
+          }
+        });
       }
     });
 
@@ -328,7 +363,7 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
       unsubscribe();
       socket.disconnect();
     };
-  }, [mode, activeIncident, isMessagesOpen]);
+  }, []);
 
   // Current real position of the vehicle
   const currentVehicleCoords: [number, number] = deviceGpsCoords || (() => {
@@ -340,7 +375,28 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
   })();
 
   // Broadcast live responder presence and apparatus to server & Citizen MapScreen
+  const lastSyncCoordsRef = useRef<[number, number] | null>(null);
+  const lastSyncTimeRef = useRef<number>(0);
+
   useEffect(() => {
+    if (!currentVehicleCoords || (currentVehicleCoords[0] === 0 && currentVehicleCoords[1] === 0)) return;
+
+    const now = Date.now();
+    const timeSinceLast = now - lastSyncTimeRef.current;
+    
+    // Check distance moved since last broadcast
+    const distMoved = lastSyncCoordsRef.current
+      ? calculateDistance(lastSyncCoordsRef.current[0], lastSyncCoordsRef.current[1], currentVehicleCoords[0], currentVehicleCoords[1])
+      : 999;
+
+    // Only broadcast telemetry if 1.5s has passed and vehicle moved >= 4m, or mode/status changed
+    if (timeSinceLast < 1500 && distMoved < 4) {
+      return;
+    }
+
+    lastSyncTimeRef.current = now;
+    lastSyncCoordsRef.current = currentVehicleCoords;
+
     const payload = {
       id: userProfile?.uid || `resp-${apparatus}`,
       callSign,
@@ -404,10 +460,20 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
   }, [activeIncident?.id, callSign]);
 
   // 3. Compute real Dijkstra road route when entering en_route or transporting
+  const lastRoutedCoordsRef = useRef<[number, number] | null>(null);
+
   useEffect(() => {
     const currentLoc = currentVehicleCoords;
 
     if (mode === 'en_route' && activeIncident?.coords) {
+      const distFromLastRoute = lastRoutedCoordsRef.current
+        ? calculateDistance(lastRoutedCoordsRef.current[0], lastRoutedCoordsRef.current[1], currentLoc[0], currentLoc[1])
+        : 999;
+
+      // Only re-calculate road route if vehicle moved more than 35m or on mode start
+      if (distFromLastRoute < 35 && routeResult) return;
+
+      lastRoutedCoordsRef.current = currentLoc;
       calculateRealRoute(currentLoc, activeIncident.coords)
         .then((res) => {
           setRouteResult(res);
@@ -424,6 +490,7 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
     } else if (mode === 'waiting' || mode === 'offline') {
       setRouteResult(null);
       setRoutePoints([]);
+      lastRoutedCoordsRef.current = null;
     }
   }, [mode, activeIncident?.coords, currentVehicleCoords, hospitalCoords]);
 
@@ -566,11 +633,11 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
         <div className="flex items-center gap-2 pointer-events-auto">
           <button
             onClick={handleLogout}
-            className="w-10 h-10 sm:w-11 sm:h-11 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-2xl shadow-lg border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-center text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 active:scale-95 transition-all cursor-pointer"
+            className="h-10 sm:h-11 px-3 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-2xl shadow-lg border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-center text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 active:scale-95 transition-all cursor-pointer font-bold text-xs"
             aria-label="Log Out from Responder Unit"
             title="Log Out"
           >
-            <LogOut className="w-5 h-5" />
+            EXIT
           </button>
 
           {/* Active Unit Badge (locked to registered profile from sign-up) */}
@@ -603,20 +670,20 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
             }`}
             title={isGpsActive ? `Live GPS Locked (±${gpsAccuracy}m)` : 'GPS Acquiring...'}
           >
-            <LocateFixed className={`w-4 h-4 ${isGpsActive ? 'text-emerald-600' : 'text-neutral-400'}`} />
-            <span className="hidden sm:inline">{isGpsActive ? `±${gpsAccuracy}m` : 'Locating'}</span>
+            <span className={`w-2 h-2 rounded-full ${isGpsActive ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-400'}`}></span>
+            <span>{isGpsActive ? `±${gpsAccuracy}m` : 'Locating'}</span>
           </button>
 
           {/* Messages / CAD Comms Button with Notification Badge */}
           <button
             onClick={handleOpenMessages}
-            className="relative w-10 h-10 sm:w-11 sm:h-11 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-2xl shadow-lg border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-center text-neutral-800 dark:text-white hover:bg-white active:scale-95 transition-all cursor-pointer"
+            className="relative h-10 sm:h-11 px-3 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-2xl shadow-lg border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-center text-neutral-800 dark:text-white hover:bg-white active:scale-95 transition-all cursor-pointer font-bold text-xs"
             aria-label="Dispatch Comms & Citizen Messages"
             title="Dispatch & Citizen Comms"
           >
-            <MessageSquare className="w-5 h-5 text-neutral-800 dark:text-white" />
+            COMMS
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#B41A46] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md animate-pulse">
+              <span className="ml-1 px-1.5 py-0.2 bg-[#B41A46] text-white text-[10px] font-bold rounded-full shadow-md animate-pulse">
                 {unreadCount}
               </span>
             )}
@@ -630,8 +697,8 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
           onClick={handleOpenMessages}
           className="absolute top-16 right-3 sm:right-4 z-30 max-w-sm bg-neutral-950 text-white rounded-2xl p-3.5 shadow-2xl border border-rose-500/50 animate-[fade-in_0.2s_ease-out] cursor-pointer flex items-start gap-3"
         >
-          <div className="w-8 h-8 rounded-xl bg-rose-600/30 text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/50">
-            <Radio className="w-4 h-4 animate-pulse" />
+          <div className="w-8 h-8 rounded-xl bg-rose-600/30 text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/50 text-xs font-mono font-bold">
+            MSG
           </div>
           <div className="flex-1 min-w-0 pr-1">
             <div className="flex items-center justify-between">
@@ -653,8 +720,8 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
       {isCallActive && (
         <div className="absolute top-16 left-3 sm:left-4 right-3 sm:right-4 z-30 bg-emerald-950/95 text-white rounded-2xl p-3 shadow-2xl border border-emerald-500/50 flex items-center justify-between animate-[fade-in_0.2s_ease-out]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/30 text-emerald-400 flex items-center justify-center">
-              <Phone className="w-4 h-4 fill-current animate-pulse" />
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold text-xs">
+              CALL
             </div>
             <div>
               <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold block">
@@ -669,10 +736,10 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={toggleMute}
-              className="p-2.5 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 text-white transition-colors cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 text-white transition-colors cursor-pointer text-xs font-bold"
               title={isMuted ? 'Unmute' : 'Mute'}
             >
-              {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+              {isMuted ? 'MUTED' : 'MUTE'}
             </button>
             <button
               onClick={handleEndDirectCall}
@@ -688,8 +755,8 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
       {webrtcIncomingCall && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-[fade-in_0.2s_ease-out]">
           <div className="w-full max-w-sm bg-neutral-950 text-white rounded-3xl p-6 border border-rose-500/50 shadow-2xl space-y-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-rose-600/30 text-rose-500 border-2 border-rose-500 flex items-center justify-center mx-auto animate-pulse">
-              <Phone className="w-8 h-8 fill-current" />
+            <div className="w-16 h-16 rounded-full bg-rose-600/30 text-rose-500 border-2 border-rose-500 flex items-center justify-center mx-auto animate-pulse font-mono font-bold text-sm">
+              CALL
             </div>
 
             <div>
@@ -700,7 +767,7 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
                 {webrtcIncomingCall.callerName}
               </h2>
               <p className="text-xs text-neutral-400 mt-1 flex items-center justify-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span className="text-[11px] font-bold text-rose-400">LOC:</span>
                 <span className="truncate max-w-[240px]">{webrtcIncomingCall.callerLocation}</span>
               </p>
             </div>
@@ -716,7 +783,6 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
                 onClick={handleAcceptIncomingCall}
                 className="py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl shadow-lg flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               >
-                <Phone className="w-4 h-4 fill-current" />
                 <span>ACCEPT & TALK</span>
               </button>
             </div>
@@ -729,8 +795,8 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
         <div className="absolute top-16 left-3 sm:left-4 right-3 sm:right-4 z-20 bg-neutral-950 text-white rounded-2xl p-3.5 shadow-2xl border border-neutral-800 animate-[fade-in_0.2s_ease-out]">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3 min-w-0 pr-2">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
-                <CornerUpRight className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 font-mono font-bold text-xs">
+                NAV
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] text-neutral-400 font-mono uppercase tracking-wider truncate">
@@ -876,7 +942,7 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
           {/* Incident Details Card */}
           <div className="p-3.5 bg-neutral-900/80 rounded-2xl border border-neutral-800 space-y-2 text-xs text-neutral-300 mb-4">
             <div className="flex items-start space-x-2">
-              <MapPin className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+              <span className="text-rose-500 font-mono font-bold shrink-0 mt-0.5">[LOC]</span>
               <span className="font-semibold text-white">{activeIncident.location}</span>
             </div>
             <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-neutral-800 text-neutral-400">
@@ -902,7 +968,6 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
               onClick={handleAcceptDispatch}
               className="col-span-2 py-4 bg-[#B41A46] hover:bg-[#9a143a] text-white rounded-2xl font-extrabold text-sm uppercase tracking-wider shadow-[0_4px_20px_rgba(180,26,70,0.5)] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <Check className="w-4 h-4" />
               <span>ACCEPT DISPATCH</span>
             </button>
           </div>
@@ -928,25 +993,25 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleOpenMessages}
-                className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white flex items-center justify-center hover:bg-neutral-200 transition-colors cursor-pointer"
+                className="px-3 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white font-bold text-xs hover:bg-neutral-200 transition-colors cursor-pointer"
                 title="Message Citizen / Dispatch"
               >
-                <MessageSquare className="w-4 h-4" />
+                COMMS
               </button>
 
               <a
                 href="tel:911"
-                className="w-10 h-10 rounded-full bg-[#B41A46] text-white flex items-center justify-center hover:bg-[#9a143a] transition-colors"
+                className="px-3 py-2 rounded-xl bg-[#B41A46] text-white font-bold text-xs hover:bg-[#9a143a] transition-colors"
                 title="Call Citizen"
               >
-                <Phone className="w-4 h-4" />
+                CALL
               </a>
             </div>
           </div>
 
           {/* Medical Allergy Warning if available */}
           <div className="mt-3 p-2.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40 rounded-xl flex items-center space-x-2 text-xs text-rose-800 dark:text-rose-300">
-            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span className="font-bold text-rose-600 font-mono text-[11px] shrink-0">[ALERT]</span>
             <span className="font-semibold text-[11px] truncate">
               CAD ALERT: Penicillin Allergy Flagged &bull; Approach with Resuscitation ALS
             </span>
@@ -956,7 +1021,6 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
             onClick={handleMarkArrivedOnScene}
             className="w-full mt-4 py-4 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-bold text-xs tracking-wider uppercase shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Check className="w-4 h-4" />
             <span>MARK ARRIVED ON SCENE</span>
           </button>
         </div>
@@ -997,7 +1061,6 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
             onClick={handleCommenceTransport}
             className="w-full mt-4 py-4 bg-neutral-950 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-2xl font-bold text-xs tracking-wider uppercase shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Heart className="w-4 h-4 text-rose-500 fill-current" />
             <span>PATIENT SECURED &bull; COMMENCE TRANSPORT</span>
           </button>
         </div>
@@ -1027,7 +1090,6 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
             onClick={handleCompleteHandover}
             className="w-full mt-4 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs tracking-wider uppercase shadow-lg active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Check className="w-4 h-4" />
             <span>COMPLETE HANDOVER & CLEAR UNIT</span>
           </button>
         </div>
@@ -1046,8 +1108,8 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
             {/* Modal Header */}
             <div className="px-5 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-neutral-100 dark:bg-neutral-800 text-[#B41A46] dark:text-rose-400 flex items-center justify-center font-bold">
-                  <Radio className="w-4 h-4" />
+                <div className="w-9 h-9 rounded-2xl bg-neutral-100 dark:bg-neutral-800 text-[#B41A46] dark:text-rose-400 flex items-center justify-center font-bold text-xs font-mono">
+                  RAD
                 </div>
                 <div>
                   <h3 className="font-bold text-sm tracking-tight leading-tight">
@@ -1061,10 +1123,10 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
 
               <button
                 onClick={() => setIsMessagesOpen(false)}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                className="px-2.5 py-1 text-xs font-bold text-neutral-400 hover:text-neutral-700 dark:hover:text-white rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                 aria-label="Close Comms"
               >
-                <X className="w-5 h-5" />
+                Close
               </button>
             </div>
 
@@ -1074,25 +1136,25 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
                 onClick={() => handleSendMessage('En route to scene, approaching coordinates')}
                 className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all hover:border-[#B41A46] cursor-pointer"
               >
-                📢 En Route
+                En Route
               </button>
               <button
                 onClick={() => handleSendMessage('Heavy intersection traffic encountered on route')}
                 className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all hover:border-[#B41A46] cursor-pointer"
               >
-                🚦 Traffic Delay
+                Traffic Delay
               </button>
               <button
                 onClick={() => handleSendMessage('On scene, initiating patient assessment')}
                 className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all hover:border-[#B41A46] cursor-pointer"
               >
-                🏥 On Scene
+                On Scene
               </button>
               <button
                 onClick={() => handleSendMessage('Requesting police assistance at the scene')}
                 className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 whitespace-nowrap active:scale-95 transition-all hover:border-[#B41A46] cursor-pointer"
               >
-                🚓 Need Police
+                Need Police
               </button>
             </div>
 
@@ -1144,10 +1206,10 @@ export default function ResponderView({ onBack }: ResponderViewProps) {
               <button
                 type="submit"
                 disabled={!messageInput.trim()}
-                className="w-11 h-11 bg-[#B41A46] hover:bg-[#9a143a] disabled:opacity-40 text-white rounded-2xl flex items-center justify-center transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
+                className="px-4 h-11 bg-[#B41A46] hover:bg-[#9a143a] disabled:opacity-40 text-white rounded-2xl flex items-center justify-center transition-all shadow-xs shrink-0 cursor-pointer active:scale-95 font-bold text-xs"
                 title="Send Message"
               >
-                <Send className="w-4 h-4" />
+                SEND
               </button>
             </form>
           </div>

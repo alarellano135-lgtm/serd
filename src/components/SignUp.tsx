@@ -1,26 +1,4 @@
 import React, { useState } from 'react';
-import { 
-  ArrowLeft, 
-  AlertCircle, 
-  Loader2, 
-  Shield, 
-  Siren, 
-  Check, 
-  Calendar, 
-  Plus, 
-  Trash2, 
-  Eye, 
-  EyeOff, 
-  ChevronRight,
-  Heart,
-  User,
-  Radio,
-  Building,
-  Truck,
-  Phone,
-  Search,
-  X
-} from 'lucide-react';
 import { updateStoredProfile, AllergyItem } from '../lib/userSettings';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -527,10 +505,10 @@ export default function SignUp({ onNavigate }: SignUpProps) {
           <button 
             type="button"
             onClick={handleBack}
-            className="p-2 -ml-2 text-gray-700 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+            className="px-2.5 py-1 text-gray-700 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer text-xs font-bold"
             aria-label="Back"
           >
-            <ArrowLeft className="w-5 h-5" />
+            &larr; Back
           </button>
           
           <div className="text-center">
@@ -563,7 +541,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
         {/* Error Alert Box */}
         {error && (
           <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-start gap-3 animate-[fade-in_0.2s_ease-out]">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+            <span className="font-mono font-bold text-xs text-rose-600 shrink-0 mt-0.5">[!]</span>
             <div className="flex-1 leading-relaxed font-medium">
               <span>{error}</span>
             </div>
@@ -597,8 +575,8 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                 }`}
               >
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-[#B41A46]/10 text-[#B41A46] flex items-center justify-center shrink-0">
-                    <Heart className="w-6 h-6" />
+                  <div className="w-12 h-12 rounded-xl bg-[#B41A46]/10 text-[#B41A46] flex items-center justify-center shrink-0 font-bold text-xs tracking-wider">
+                    CITIZEN
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
@@ -630,8 +608,8 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                 }`}
               >
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
-                    <Siren className="w-6 h-6" />
+                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0 font-bold text-xs tracking-wider">
+                    UNIT
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
@@ -658,8 +636,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               onClick={() => setStep(2)}
               className="w-full mt-6 py-4 bg-[#B41A46] text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgb(180,26,70,0.25)] hover:bg-[#9a143a] transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <span>Continue with {accountType === 'citizen' ? 'Citizen' : 'Responder'}</span>
-              <ChevronRight className="w-4 h-4" />
+              <span>Continue with {accountType === 'citizen' ? 'Citizen' : 'Responder'} &rarr;</span>
             </button>
           </div>
         )}
@@ -686,18 +663,15 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                   Full Legal Name <span className="text-[#B41A46]">*</span>
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Juan dela Cruz"
-                    className="w-full px-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#B41A46] focus:ring-4 focus:ring-[#B41A46]/10 text-gray-900 text-sm font-medium transition-all"
-                  />
-                  <User className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2" />
-                </div>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Juan dela Cruz"
+                  className="w-full px-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#B41A46] focus:ring-4 focus:ring-[#B41A46]/10 text-gray-900 text-sm font-medium transition-all"
+                />
               </div>
 
               <div>
@@ -719,16 +693,13 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                     Tactical Call Sign / Radio Alias
                   </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={callSign}
-                      onChange={(e) => setCallSign(e.target.value)}
-                      placeholder="e.g. Medic-4 or Sierra-1"
-                      className="w-full px-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-gray-900 text-sm font-medium transition-all font-mono"
-                    />
-                    <Radio className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2" />
-                  </div>
+                  <input
+                    type="text"
+                    value={callSign}
+                    onChange={(e) => setCallSign(e.target.value)}
+                    placeholder="e.g. Medic-4 or Sierra-1"
+                    className="w-full px-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-gray-900 text-sm font-medium transition-all font-mono"
+                  />
                 </div>
               )}
             </div>
@@ -737,8 +708,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               type="submit"
               className="w-full mt-8 py-4 bg-[#B41A46] text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgb(180,26,70,0.25)] hover:bg-[#9a143a] transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <span>Next: Account Credentials</span>
-              <ChevronRight className="w-4 h-4" />
+              <span>Next: Account Credentials &rarr;</span>
             </button>
           </form>
         )}
@@ -785,14 +755,14 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 6 characters"
-                    className="w-full px-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#B41A46] focus:ring-4 focus:ring-[#B41A46]/10 text-gray-900 text-sm font-medium transition-all pr-12"
+                    className="w-full px-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#B41A46] focus:ring-4 focus:ring-[#B41A46]/10 text-gray-900 text-sm font-medium transition-all pr-16"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 px-1 py-0.5 text-xs font-bold cursor-pointer"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? 'Hide' : 'Show'}
                   </button>
                 </div>
               </div>
@@ -816,8 +786,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               type="submit"
               className="w-full mt-8 py-4 bg-[#B41A46] text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgb(180,26,70,0.25)] hover:bg-[#9a143a] transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <span>Next: {accountType === 'citizen' ? 'Medical Profile' : 'Agency Details'}</span>
-              <ChevronRight className="w-4 h-4" />
+              <span>Next: {accountType === 'citizen' ? 'Medical Profile' : 'Agency Details'} &rarr;</span>
             </button>
           </form>
         )}
@@ -841,9 +810,8 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               {/* Date of Birth Selector with clean app styling */}
               <div className="bg-gray-50/70 border border-gray-200 rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#B41A46]" />
-                    <span>Date of Birth</span>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Date of Birth
                   </label>
                   {getAge(dob) && (
                     <span className="text-[11px] font-bold text-[#B41A46] bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-100">
@@ -932,8 +900,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               type="submit"
               className="w-full mt-6 py-4 bg-[#B41A46] text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgb(180,26,70,0.25)] hover:bg-[#9a143a] transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <span>Next: Allergies & Reactions</span>
-              <ChevronRight className="w-4 h-4" />
+              <span>Next: Allergies & Reactions &rarr;</span>
             </button>
           </form>
         )}
@@ -961,13 +928,13 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               <button
                 type="button"
                 onClick={handleNoAllergiesToggle}
-                className={`w-6 h-6 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${
+                className={`px-3 py-1 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
                   noAllergies 
                     ? 'bg-[#B41A46] border-[#B41A46] text-white' 
-                    : 'bg-white border-gray-300 text-transparent'
+                    : 'bg-white border-gray-300 text-gray-500'
                 }`}
               >
-                <Check className="w-4 h-4" />
+                {noAllergies ? 'Yes (None)' : 'No'}
               </button>
             </div>
 
@@ -990,10 +957,10 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                               <span className="font-bold text-xs text-gray-900">{item.allergen}</span>
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
                                 item.severity === 'Severe' 
-                                  ? 'bg-rose-100 text-rose-700' 
-                                  : item.severity === 'Moderate'
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : 'bg-gray-100 text-gray-600'
+                                   ? 'bg-rose-100 text-rose-700' 
+                                   : item.severity === 'Moderate'
+                                   ? 'bg-amber-100 text-amber-700'
+                                   : 'bg-gray-100 text-gray-600'
                               }`}>
                                 {item.severity}
                               </span>
@@ -1018,10 +985,10 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                             <button
                               type="button"
                               onClick={() => handleRemoveAllergy(item.id)}
-                              className="p-1 text-gray-400 hover:text-rose-600 rounded-md transition-colors"
+                              className="px-2 py-1 text-xs font-semibold text-gray-400 hover:text-rose-600 rounded-md transition-colors"
                               aria-label="Remove allergy"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              Delete
                             </button>
                           </div>
                         </div>
@@ -1121,21 +1088,20 @@ export default function SignUp({ onNavigate }: SignUpProps) {
 
                   {/* Search Bar */}
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
                       value={allergenSearchQuery}
                       onChange={(e) => setAllergenSearchQuery(e.target.value)}
                       placeholder="Search allergies, drugs, foods..."
-                      className="w-full pl-8 pr-7 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:border-[#B41A46]"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:border-[#B41A46]"
                     />
                     {allergenSearchQuery && (
                       <button
                         type="button"
                         onClick={() => setAllergenSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 text-xs font-bold"
                       >
-                        <X className="w-3 h-3" />
+                        Clear
                       </button>
                     )}
                   </div>
@@ -1179,11 +1145,9 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                             }`}
                           >
                             <span className="truncate pr-1 text-[11px]">{allergen}</span>
-                            {isSelected ? (
-                              <Check className="w-3.5 h-3.5 shrink-0 text-[#B41A46]" />
-                            ) : (
-                              <Plus className="w-3.5 h-3.5 shrink-0 text-gray-400" />
-                            )}
+                            <span className="text-[10px] font-bold">
+                              {isSelected ? '✓' : '+'}
+                            </span>
                           </button>
                         );
                       })
@@ -1198,8 +1162,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                     onClick={() => setShowCustomModal(true)}
                     className="w-full py-3 px-4 rounded-xl border border-dashed border-gray-300 hover:border-[#B41A46] bg-gray-50/50 hover:bg-rose-50/20 text-gray-700 hover:text-[#B41A46] text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Not in list? Add Custom Allergy</span>
+                    <span>+ Add Custom Allergy</span>
                   </button>
                 </div>
               </div>
@@ -1295,8 +1258,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               onClick={handleAllergiesNext}
               className="w-full mt-6 py-4 bg-[#B41A46] text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgb(180,26,70,0.25)] hover:bg-[#9a143a] transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <span>Next: Emergency Contact & Review</span>
-              <ChevronRight className="w-4 h-4" />
+              <span>Next: Emergency Contact & Review &rarr;</span>
             </button>
           </div>
         )}
@@ -1399,14 +1361,11 @@ export default function SignUp({ onNavigate }: SignUpProps) {
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                   <span>Creating Account...</span>
                 </>
               ) : (
-                <>
-                  <Shield className="w-5 h-5" />
-                  <span>COMPLETE SIGN UP</span>
-                </>
+                <span>COMPLETE SIGN UP</span>
               )}
             </button>
           </div>
@@ -1451,7 +1410,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <h4 className="font-bold text-xs sm:text-sm text-gray-900">{ag.name}</h4>
-                            {isSelected && <Check className="w-4 h-4 text-blue-700 shrink-0" />}
+                            {isSelected && <span className="text-xs font-bold text-blue-700">✓ Selected</span>}
                           </div>
                           <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">{ag.desc}</p>
                         </div>
@@ -1499,8 +1458,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               type="submit"
               className="w-full mt-6 py-4 bg-blue-700 text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgb(29,78,216,0.25)] hover:bg-blue-800 transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <span>Next: Station & Vehicle Unit</span>
-              <ChevronRight className="w-4 h-4" />
+              <span>Next: Station & Vehicle Unit &rarr;</span>
             </button>
           </form>
         )}
@@ -1524,10 +1482,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               {/* Flexible Text Input for Station */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Building className="w-3.5 h-3.5 text-blue-700" />
-                    <span>Assigned Station / Post Location</span>
-                  </span>
+                  <span>Assigned Station / Post Location</span>
                   <span className="text-[11px] font-normal text-gray-400">Any City / District</span>
                 </label>
                 <input
@@ -1543,9 +1498,8 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Truck className="w-3.5 h-3.5 text-blue-700" />
-                  <span>Vehicle Unit Code <span className="text-blue-700">*</span></span>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  Vehicle Unit Code <span className="text-blue-700">*</span>
                 </label>
                 <input
                   type="text"
@@ -1580,7 +1534,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
                       }`}
                     >
                       <span>{shift}</span>
-                      {dutyShift === shift && <Check className="w-4 h-4 text-blue-700" />}
+                      {dutyShift === shift && <span className="text-xs font-bold text-blue-700">✓</span>}
                     </button>
                   ))}
                 </div>
@@ -1591,8 +1545,7 @@ export default function SignUp({ onNavigate }: SignUpProps) {
               type="submit"
               className="w-full mt-6 py-4 bg-blue-700 text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgb(29,78,216,0.25)] hover:bg-blue-800 transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              <span>Next: Review & Confirm</span>
-              <ChevronRight className="w-4 h-4" />
+              <span>Next: Review & Confirm &rarr;</span>
             </button>
           </form>
         )}
@@ -1615,8 +1568,8 @@ export default function SignUp({ onNavigate }: SignUpProps) {
             {/* Responder Summary Card */}
             <div className="bg-white border-2 border-blue-100 rounded-2xl p-5 space-y-3.5 shadow-xs">
               <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-                  <Siren className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs font-mono">
+                  UNIT
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-gray-900">{fullName}</h3>
@@ -1661,14 +1614,11 @@ export default function SignUp({ onNavigate }: SignUpProps) {
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                   <span>Registering Responder Profile...</span>
                 </>
               ) : (
-                <>
-                  <Siren className="w-5 h-5" />
-                  <span>COMPLETE RESPONDER REGISTRATION</span>
-                </>
+                <span>COMPLETE RESPONDER REGISTRATION</span>
               )}
             </button>
           </div>

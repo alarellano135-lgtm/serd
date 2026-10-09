@@ -1,22 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  User, 
-  Phone, 
-  PhoneCall, 
-  PhoneOff, 
-  MessageSquare, 
-  Shield, 
-  Ambulance, 
-  Flame, 
-  Lock,
-  LocateFixed,
-  Volume2,
-  VolumeX,
-  X,
-  Send,
-  Navigation,
-  AlertCircle
-} from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { io } from 'socket.io-client';
@@ -190,6 +172,8 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
   const [incidentStatus, setIncidentStatus] = useState<string>('dispatched');
 
   // Two-way messaging with responder
+  const [selectedResponder, setSelectedResponder] = useState<LiveOnlineResponder | null>(null);
+  const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [messages, setMessages] = useState<IncidentChatMessage[]>([]);
   const [unreadMsgCount, setUnreadMsgCount] = useState<number>(0);
   const [incomingMsgToast, setIncomingMsgToast] = useState<IncidentChatMessage | null>(null);
@@ -294,8 +278,15 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
     };
   }, [citizenLocation]);
 
+  // Active target responder: ONLY defined when citizen or dispatch has chosen a specific unit
+  const activeTargetResponder = useMemo<LiveOnlineResponder | null>(() => {
+    if (dispatchedResponder) return dispatchedResponder;
+    if (selectedResponder) return selectedResponder;
+    return null;
+  }, [dispatchedResponder, selectedResponder]);
+
   // Find active online responder matching selected service (null if offline)
-  const currentResponder = useMemo<LiveOnlineResponder | null>(() => {
+  const nearestMatchingResponder = useMemo<LiveOnlineResponder | null>(() => {
     const matching = onlineResponders.filter(r => r.apparatus === selectedService);
     if (matching.length > 0) {
       if (!citizenLocation) return matching[0];
@@ -305,9 +296,10 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
         return dCurr < dPrev ? curr : prev;
       });
     }
-    if (onlineResponders.length > 0) return onlineResponders[0];
-    return null;
+    return onlineResponders[0] || null;
   }, [onlineResponders, selectedService, citizenLocation]);
+
+  const currentResponder = activeTargetResponder || nearestMatchingResponder;
 
   // Calculate live road route whenever responder or citizen coords update during dispatch
   useEffect(() => {
@@ -328,9 +320,10 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
 
   // Trigger dispatch to real CAD backend
   const triggerDispatch = async (respToUse?: LiveOnlineResponder | null) => {
-    if (!citizenLocation) return;
-    const target = respToUse !== undefined ? respToUse : currentResponder;
+    if (!citizenLocation) return null;
+    const target = respToUse !== undefined ? respToUse : (activeTargetResponder || currentResponder);
     setDispatchedResponder(target);
+    if (target) setSelectedResponder(target);
     setIsDispatched(true);
     playChime(659.25, 880);
 
@@ -359,6 +352,8 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
         })
         .catch(() => {});
     }
+
+    return created;
   };
 
   // Auto-dispatch if requested from Home hold countdown and not already active
@@ -449,22 +444,40 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
 
   const handleSendCommsMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatMessage.trim()) return;
+    const textToSend = chatMessage.trim();
+    if (!textToSend) return;
 
-    if (activeIncidentId) {
-      await sendIncidentMessage(activeIncidentId, {
-        sender: 'citizen',
-        senderName: citizenName,
-        text: chatMessage.trim()
-      });
+    if (!activeTargetResponder) {
+      setSelectionNotice('Please select an active responder unit first to start messaging.');
+      setShowMessageModal(false);
+      return;
     }
 
-    setMessageSentToast(true);
-    setChatMessage('');
-    setTimeout(() => {
-      setMessageSentToast(false);
-      setShowMessageModal(false);
-    }, 1500);
+    let targetIncId = activeIncidentId;
+    if (!targetIncId) {
+      const created = await triggerDispatch(activeTargetResponder);
+      if (created?.id) targetIncId = created.id;
+    }
+
+    if (targetIncId) {
+      const optimisticMsg: IncidentChatMessage = {
+        id: 'msg-' + Date.now(),
+        sender: 'citizen',
+        senderName: citizenName,
+        text: textToSend,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, optimisticMsg]);
+      setChatMessage('');
+      setMessageSentToast(true);
+      setTimeout(() => setMessageSentToast(false), 2000);
+
+      await sendIncidentMessage(targetIncId, {
+        sender: 'citizen',
+        senderName: citizenName,
+        text: textToSend
+      });
+    }
   };
 
   // Estimated distance & ETA
@@ -500,19 +513,24 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
             <Marker position={citizenLocation} icon={createCitizenIcon(mapZoom)} zIndexOffset={900} />
 
             {/* Real Online Responders on Map */}
-            {onlineResponders.map(resp => (
-              <Marker
-                key={resp.id}
-                position={resp.coords}
-                icon={createResponderMarkerIcon(resp, resp.apparatus === selectedService, mapZoom)}
-                zIndexOffset={resp.apparatus === selectedService ? 1000 : 800}
-                eventHandlers={{
-                  click: () => {
-                    setSelectedService(resp.apparatus);
-                  }
-                }}
-              />
-            ))}
+            {onlineResponders.map(resp => {
+              const isSelected = activeTargetResponder?.id === resp.id;
+              return (
+                <Marker
+                  key={resp.id}
+                  position={resp.coords}
+                  icon={createResponderMarkerIcon(resp, isSelected, mapZoom)}
+                  zIndexOffset={isSelected ? 1000 : 800}
+                  eventHandlers={{
+                    click: () => {
+                      setSelectedResponder(resp);
+                      setSelectedService(resp.apparatus);
+                      setSelectionNotice(null);
+                    }
+                  }}
+                />
+              );
+            })}
 
             {/* Real Road Route Polyline */}
             {isDispatched && routePoints.length > 0 && (
@@ -528,10 +546,9 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
           </MapContainer>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center p-6 text-white text-center">
-            <LocateFixed className="w-12 h-12 text-[#B41A46] animate-pulse mb-3" />
             <h3 className="font-bold text-base">Locking GPS Coordinates...</h3>
             <p className="text-xs text-neutral-400 mt-1 max-w-xs">
-              Connecting directly to your mobile device satellite receiver
+              Connecting to device satellite receiver
             </p>
             <button
               onClick={requestLocation}
@@ -549,15 +566,15 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
           {onBack && (
             <button
               onClick={onBack}
-              className="w-10 h-10 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-2xl shadow-lg border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-center text-neutral-800 dark:text-white cursor-pointer active:scale-95 transition-all"
+              className="h-9 px-3 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-xl shadow-sm border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-center text-xs font-semibold text-neutral-800 dark:text-white cursor-pointer active:scale-95 transition-all"
               title="Back"
             >
-              ✕
+              Back
             </button>
           )}
 
-          <div className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-2xl px-3 py-2 shadow-lg border border-neutral-200/80 dark:border-neutral-800 flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <div className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-xl px-3 py-2 shadow-sm border border-neutral-200/80 dark:border-neutral-800 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span className="text-xs font-bold text-neutral-800 dark:text-white">
               {onlineResponders.length > 0 ? `${onlineResponders.length} Responders Live` : 'Standby Service Ready'}
             </span>
@@ -566,10 +583,10 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
 
         <button
           onClick={requestLocation}
-          className="pointer-events-auto w-10 h-10 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-2xl shadow-lg border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-center text-neutral-800 dark:text-white cursor-pointer active:scale-95 transition-all"
+          className="pointer-events-auto h-9 px-3 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md rounded-xl shadow-sm border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-center text-xs font-semibold text-[#B41A46] dark:text-rose-400 cursor-pointer active:scale-95 transition-all"
           title="Recenter on my GPS"
         >
-          <LocateFixed className={`w-5 h-5 ${isLocating ? 'animate-spin text-neutral-400' : 'text-[#B41A46]'}`} />
+          {isLocating ? 'Locating...' : 'Locate'}
         </button>
       </div>
 
@@ -578,22 +595,17 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
         <div className="absolute top-16 left-3 sm:left-4 right-3 sm:right-4 z-30 max-w-md mx-auto bg-neutral-950/95 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border border-rose-500/50 animate-[fade-in_0.2s_ease-out]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 ${
-                isCallActive ? 'bg-emerald-600 text-white' : 'bg-rose-600/30 text-rose-500 border border-rose-500 animate-pulse'
-              }`}>
-                {isCallActive ? <Phone className="w-5 h-5 fill-current" /> : <PhoneCall className="w-5 h-5 animate-bounce" />}
-              </div>
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-wider text-rose-400 font-bold block">
-                  {isCalling ? 'RINGING RESPONDER TABLET...' : 'LIVE AUDIO CALL CONNECTED'}
+                  {isCalling ? 'CALLING RESPONDER...' : 'LIVE AUDIO CALL'}
                 </span>
                 <h3 className="text-sm font-bold text-white leading-tight">
                   {currentResponder?.callSign || 'Central Emergency Dispatch'}
                 </h3>
                 <p className="text-[11px] text-neutral-400">
                   {isCallActive 
-                    ? `Two-Way Audio • ${String(Math.floor(callDurationSec / 60)).padStart(2, '0')}:${String(callDurationSec % 60).padStart(2, '0')}`
-                    : 'Alerting responder in the field...'}
+                    ? `Connected • ${String(Math.floor(callDurationSec / 60)).padStart(2, '0')}:${String(callDurationSec % 60).padStart(2, '0')}`
+                    : 'Alerting responder unit...'}
                 </p>
               </div>
             </div>
@@ -602,25 +614,22 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
               {isCallActive && (
                 <button
                   onClick={toggleMute}
-                  className="p-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white transition-colors cursor-pointer"
-                  title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                  className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs text-white transition-colors cursor-pointer"
                 >
-                  {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+                  {isMuted ? 'Unmute' : 'Mute'}
                 </button>
               )}
               <button
                 onClick={handleEndCall}
-                className="px-3.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-xs cursor-pointer active:scale-95"
               >
-                <PhoneOff className="w-3.5 h-3.5" />
-                <span>End</span>
+                End
               </button>
             </div>
           </div>
           {micError && (
-            <p className="text-[10px] text-amber-400 mt-2 font-medium flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" />
-              <span>{micError}</span>
+            <p className="text-[10px] text-amber-400 mt-2 font-medium">
+              {micError}
             </p>
           )}
         </div>
@@ -631,69 +640,44 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
         
         {/* Active Responder Identity */}
         <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center space-x-3 min-w-0 flex-1">
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 text-xl ${
-              selectedService === 'police'
-                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400'
-                : selectedService === 'fire'
-                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400'
-                : 'bg-rose-50 text-[#B41A46] dark:bg-rose-950/50 dark:text-rose-400'
-            }`}>
-              {selectedService === 'police' ? '🚓' : selectedService === 'fire' ? '🚒' : '🚑'}
-            </div>
-            <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono uppercase font-bold text-neutral-500 dark:text-neutral-400">
+                {selectedService.toUpperCase()}
+              </span>
               <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">
                 {currentResponder?.callSign || 'Central CAD Dispatch'}
               </h3>
-              <p className="text-[11px] text-gray-500 dark:text-neutral-400 truncate">
-                {isDispatched 
-                  ? 'Dispatched & En Route to your GPS' 
-                  : currentResponder 
-                    ? 'Live Online Field Unit • Standby' 
-                    : 'Direct Dispatch to CAD Command'}
-              </p>
             </div>
+            <p className="text-[11px] text-gray-500 dark:text-neutral-400 truncate mt-0.5">
+              {isDispatched 
+                ? 'Dispatched & En Route' 
+                : currentResponder 
+                  ? 'Online Field Unit • Standby' 
+                  : 'Direct Dispatch Queue'}
+            </p>
           </div>
 
           <div className="shrink-0 text-right">
             {isDispatched ? (
-              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-bold transition-all ${
-                incidentStatus === 'on_scene'
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                  : incidentStatus === 'transporting'
-                  ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
-                  : incidentStatus === 'en_route'
-                  ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'
-                  : 'bg-rose-50 dark:bg-rose-950/40 border-rose-100 dark:border-rose-900/50 text-[#B41A46] dark:text-rose-400'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                  incidentStatus === 'on_scene' 
-                    ? 'bg-emerald-600' 
-                    : incidentStatus === 'transporting' 
-                    ? 'bg-amber-600' 
-                    : incidentStatus === 'en_route' 
-                    ? 'bg-blue-600' 
-                    : 'bg-[#B41A46]'
-                }`} />
-                <span>
-                  {incidentStatus === 'on_scene' 
-                    ? 'ON SCENE' 
-                    : incidentStatus === 'transporting' 
-                    ? 'TRANSPORTING' 
-                    : incidentStatus === 'en_route' 
-                    ? (routeResult ? `EN ROUTE • ${formatEta(routeResult.durationSeconds)}` : 'EN ROUTE') 
-                    : (routeResult ? `${formatDistance(routeResult.distanceMeters)} • ${formatEta(routeResult.durationSeconds)}` : 'DISPATCHED')}
-                </span>
+              <div className="text-xs font-bold text-[#B41A46] dark:text-rose-400">
+                {incidentStatus === 'on_scene' 
+                  ? 'ON SCENE' 
+                  : incidentStatus === 'transporting' 
+                  ? 'TRANSPORTING' 
+                  : incidentStatus === 'en_route' 
+                  ? (routeResult ? `EN ROUTE • ${formatEta(routeResult.durationSeconds)}` : 'EN ROUTE') 
+                  : (routeResult ? `${formatDistance(routeResult.distanceMeters)} • ${formatEta(routeResult.durationSeconds)}` : 'DISPATCHED')}
               </div>
             ) : currentResponder ? (
-              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gray-100 dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 text-xs font-semibold">
-                <span className="font-bold">{formatDistance(estDistanceMeters)}</span>
-                <span className="text-gray-300 dark:text-neutral-600">&bull;</span>
+              <div className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                <span>{formatDistance(estDistanceMeters)}</span>
+                <span className="mx-1">&middot;</span>
                 <span className="text-[#B41A46] dark:text-rose-400">{formatEta(estDurationSeconds)}</span>
               </div>
             ) : (
-              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 text-xs font-semibold">
-                <span>CAD Queue</span>
+              <div className="text-xs font-semibold text-neutral-500">
+                Standby
               </div>
             )}
           </div>
@@ -706,8 +690,7 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
               Select Service
             </span>
             {isDispatched && (
-              <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1">
-                <Lock className="w-3 h-3" />
+              <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold">
                 Unit Dispatched
               </span>
             )}
@@ -718,44 +701,90 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
               type="button"
               disabled={isDispatched}
               onClick={() => setSelectedService('police')}
-              className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`py-2 px-2 rounded-xl text-xs font-bold text-center transition-colors cursor-pointer ${
                 selectedService === 'police'
-                  ? 'bg-blue-600 text-white shadow-xs'
+                  ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 hover:bg-gray-200'
               }`}
             >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Police</span>
+              Police
             </button>
 
             <button
               type="button"
               disabled={isDispatched}
               onClick={() => setSelectedService('ambulance')}
-              className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`py-2 px-2 rounded-xl text-xs font-bold text-center transition-colors cursor-pointer ${
                 selectedService === 'ambulance'
-                  ? 'bg-[#B41A46] text-white shadow-xs'
+                  ? 'bg-[#B41A46] text-white'
                   : 'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 hover:bg-gray-200'
               }`}
             >
-              <Ambulance className="w-3.5 h-3.5" />
-              <span>Ambulance</span>
+              Ambulance
             </button>
 
             <button
               type="button"
               disabled={isDispatched}
               onClick={() => setSelectedService('fire')}
-              className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`py-2 px-2 rounded-xl text-xs font-bold text-center transition-colors cursor-pointer ${
                 selectedService === 'fire'
-                  ? 'bg-amber-600 text-white shadow-xs'
+                  ? 'bg-amber-600 text-white'
                   : 'bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 hover:bg-gray-200'
               }`}
             >
-              <Flame className="w-3.5 h-3.5" />
-              <span>Fire</span>
+              Fire
             </button>
           </div>
+        </div>
+
+        {/* Responder Unit Selector - Required for messaging */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between text-[11px] mb-1.5">
+            <span className="font-bold uppercase tracking-wider text-gray-500 dark:text-neutral-400 text-[10px]">
+              Select Responder Unit ({onlineResponders.length})
+            </span>
+            {activeTargetResponder ? (
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                Selected: {activeTargetResponder.callSign}
+              </span>
+            ) : (
+              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
+                Select unit to chat
+              </span>
+            )}
+          </div>
+
+          {onlineResponders.length === 0 ? (
+            <div className="p-2 bg-gray-50 dark:bg-neutral-800/60 rounded-xl border border-gray-200 dark:border-neutral-700 text-center text-xs text-gray-400">
+              No field units currently online. Standby.
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+              {onlineResponders.map(r => {
+                const isChosen = activeTargetResponder?.id === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedResponder(r);
+                      setSelectedService(r.apparatus);
+                      setSelectionNotice(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer ${
+                      isChosen
+                        ? 'bg-[#B41A46] text-white border-[#B41A46]'
+                        : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-gray-200 dark:border-neutral-700 hover:border-[#B41A46]'
+                    }`}
+                  >
+                    <span className="font-bold truncate max-w-[120px]">{r.callSign}</span>
+                    <span className="text-[10px] uppercase font-mono opacity-80">({r.apparatus})</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Dual Actions: CALL RESPONDER MOBILE & DISPATCH / MESSAGE */}
@@ -769,31 +798,43 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
                 setShowCallConfirmModal(true);
               }
             }}
-            className={`py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-95 ${
+            className={`py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center cursor-pointer active:scale-95 ${
               isDispatched
                 ? 'bg-neutral-900 text-neutral-300 hover:bg-neutral-800 border border-neutral-700'
                 : 'bg-[#B41A46] hover:bg-[#9a143a] text-white'
             }`}
           >
-            {isDispatched ? <PhoneOff className="w-4 h-4" /> : <Phone className="w-4 h-4 fill-current" />}
-            <span>{isDispatched ? 'CANCEL CALL' : 'CALL RESPONDER'}</span>
+            {isDispatched ? 'CANCEL CALL' : 'CALL RESPONDER'}
           </button>
 
           <button
             type="button"
-            onClick={() => {
-              if (!isDispatched) {
-                triggerDispatch();
+            disabled={!activeTargetResponder}
+            onClick={async () => {
+              if (!activeTargetResponder) {
+                setSelectionNotice('Please select an active responder unit on the map or list to start messaging.');
+                return;
+              }
+              setSelectionNotice(null);
+              if (!isDispatched || !activeIncidentId) {
+                await triggerDispatch(activeTargetResponder);
               }
               setUnreadMsgCount(0);
               setShowMessageModal(true);
             }}
-            className="relative py-3 rounded-xl bg-white dark:bg-neutral-900 border border-[#B41A46] text-[#B41A46] dark:text-rose-400 font-bold text-xs uppercase tracking-wider hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            className={`relative py-3 rounded-xl border font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center active:scale-95 ${
+              activeTargetResponder
+                ? 'bg-white dark:bg-neutral-900 border-[#B41A46] text-[#B41A46] dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer'
+                : 'bg-gray-100 dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 text-gray-400 dark:text-neutral-500 cursor-not-allowed opacity-60'
+            }`}
           >
-            <MessageSquare className="w-4 h-4" />
-            <span>MESSAGE UNIT</span>
+            <span>
+              {activeTargetResponder 
+                ? `MESSAGE ${activeTargetResponder.callSign.toUpperCase()}`
+                : 'SELECT RESPONDER TO CHAT'}
+            </span>
             {unreadMsgCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#B41A46] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md animate-pulse">
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#B41A46] text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md">
                 {unreadMsgCount}
               </span>
             )}
@@ -805,18 +846,13 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
       {showCallConfirmModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-[fade-in_0.15s_ease-out]">
           <div className="bg-white dark:bg-neutral-900 text-gray-900 dark:text-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-neutral-800 space-y-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-[#B41A46] flex items-center justify-center shrink-0">
-                <PhoneCall className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold leading-tight">
-                  Call {currentResponder?.callSign || 'Central Emergency Dispatch'}?
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
-                  Direct live voice audio & immediate GPS dispatch
-                </p>
-              </div>
+            <div>
+              <h3 className="text-base font-bold leading-tight">
+                Call {currentResponder?.callSign || 'Central Emergency Dispatch'}?
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
+                Direct audio channel and immediate GPS dispatch
+              </p>
             </div>
 
             <div className="p-3 bg-gray-50 dark:bg-neutral-800/80 rounded-2xl space-y-1.5 text-xs">
@@ -851,13 +887,20 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
               <button
                 type="button"
                 onClick={handleInitiateCall}
-                className="flex-1 py-3 bg-[#B41A46] hover:bg-[#9a143a] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                className="flex-1 py-3 bg-[#B41A46] hover:bg-[#9a143a] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer active:scale-95"
               >
-                <Phone className="w-3.5 h-3.5 fill-current" />
-                <span>Call Now</span>
+                Call Now
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Selection Notice Toast */}
+      {selectionNotice && (
+        <div className="absolute top-4 left-4 right-4 z-40 bg-neutral-900 text-white rounded-xl p-3 shadow-xl flex items-center justify-between text-xs font-medium animate-[fade-in_0.2s_ease-out]">
+          <span>{selectionNotice}</span>
+          <button onClick={() => setSelectionNotice(null)} className="ml-2 text-neutral-400 hover:text-white px-2 py-0.5 text-xs font-bold">Close</button>
         </div>
       )}
 
@@ -868,24 +911,19 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
             setUnreadMsgCount(0);
             setShowMessageModal(true);
           }}
-          className="absolute top-4 left-4 right-4 z-40 bg-neutral-950 text-white rounded-2xl p-3.5 shadow-2xl border border-rose-500/60 animate-[fade-in_0.2s_ease-out] cursor-pointer flex items-start gap-3"
+          className="absolute top-4 left-4 right-4 z-40 bg-neutral-950 text-white rounded-2xl p-3.5 shadow-2xl border border-rose-500/60 animate-[fade-in_0.2s_ease-out] cursor-pointer"
         >
-          <div className="w-8 h-8 rounded-xl bg-rose-600/30 text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/50">
-            <MessageSquare className="w-4 h-4 animate-pulse" />
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase font-bold text-rose-400">
+              {incomingMsgToast.senderName}
+            </span>
+            <span className="text-[10px] text-neutral-500 font-mono">
+              {incomingMsgToast.timestamp}
+            </span>
           </div>
-          <div className="flex-1 min-w-0 pr-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase font-bold text-rose-400">
-                {incomingMsgToast.senderName}
-              </span>
-              <span className="text-[10px] text-neutral-500 font-mono">
-                {incomingMsgToast.timestamp}
-              </span>
-            </div>
-            <p className="text-xs text-neutral-200 mt-0.5 line-clamp-2 font-medium">
-              {incomingMsgToast.text}
-            </p>
-          </div>
+          <p className="text-xs text-neutral-200 mt-1 font-medium">
+            {incomingMsgToast.text}
+          </p>
         </div>
       )}
 
@@ -894,24 +932,24 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-[fade-in_0.15s_ease-out]">
           <div className="bg-white dark:bg-neutral-900 text-gray-900 dark:text-white rounded-t-3xl sm:rounded-3xl p-5 w-full sm:max-w-md shadow-2xl border-t sm:border border-gray-200 dark:border-neutral-800 space-y-3.5 flex flex-col max-h-[85vh]">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-neutral-800 pb-3 shrink-0">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-[#B41A46] flex items-center justify-center shrink-0">
-                  <MessageSquare className="w-5 h-5" />
-                </div>
-                <div>
+              <div>
+                <div className="flex items-center gap-1.5">
                   <h3 className="text-sm font-bold leading-tight">
-                    {currentResponder?.callSign || 'Emergency Responder Unit'}
+                    {activeTargetResponder?.callSign || 'Emergency Responder'}
                   </h3>
-                  <p className="text-[11px] text-gray-400">
-                    Live two-way emergency dispatch comms
-                  </p>
+                  <span className="text-[10px] uppercase font-bold text-neutral-500 dark:text-neutral-400">
+                    ({activeTargetResponder?.apparatus || selectedService})
+                  </span>
                 </div>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Direct radio channel &bull; {activeTargetResponder ? `${formatDistance(estDistanceMeters)} (${formatEta(estDurationSeconds)})` : 'Live Link'}
+                </p>
               </div>
               <button
                 onClick={() => setShowMessageModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white bg-gray-100 dark:bg-neutral-800 cursor-pointer"
+                className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 px-2 py-1 text-xs font-semibold cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                Close
               </button>
             </div>
 
@@ -930,8 +968,8 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
                     </div>
                     <div className={`px-3 py-2 rounded-2xl text-xs max-w-[85%] font-medium leading-relaxed ${
                       m.sender === 'citizen'
-                        ? 'bg-[#B41A46] text-white rounded-tr-xs shadow-xs'
-                        : 'bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-100 rounded-tl-xs shadow-xs'
+                        ? 'bg-[#B41A46] text-white rounded-tr-xs'
+                        : 'bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-100 rounded-tl-xs'
                     }`}>
                       {m.text}
                     </div>
@@ -947,32 +985,31 @@ export default function MapScreen({ autoDispatch, initialIncidentId, onBack }: M
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
                 placeholder="Type entrance notes, gate codes, or patient changes..."
-                className="w-full p-3 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#B41A46] dark:text-white resize-none"
+                className="w-full p-3 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl text-xs font-medium focus:outline-none focus:border-[#B41A46] dark:text-white resize-none"
               />
 
               <div className="flex gap-1.5">
                 <button
                   type="button"
                   onClick={() => setChatMessage('Standing by the front gate in visible clothing')}
-                  className="flex-1 py-1 px-2 bg-gray-100 dark:bg-neutral-800 text-[10px] font-semibold rounded-lg truncate text-gray-600 dark:text-neutral-300 hover:border-[#B41A46] cursor-pointer"
+                  className="flex-1 py-1.5 px-2 bg-gray-100 dark:bg-neutral-800 text-[10px] font-semibold rounded-lg truncate text-gray-600 dark:text-neutral-300 hover:border-[#B41A46] cursor-pointer"
                 >
-                  📍 At front gate
+                  At front gate
                 </button>
                 <button
                   type="button"
                   onClick={() => setChatMessage('Patient is conscious and breathing steadily')}
-                  className="flex-1 py-1 px-2 bg-gray-100 dark:bg-neutral-800 text-[10px] font-semibold rounded-lg truncate text-gray-600 dark:text-neutral-300 hover:border-[#B41A46] cursor-pointer"
+                  className="flex-1 py-1.5 px-2 bg-gray-100 dark:bg-neutral-800 text-[10px] font-semibold rounded-lg truncate text-gray-600 dark:text-neutral-300 hover:border-[#B41A46] cursor-pointer"
                 >
-                  🫁 Breathing stable
+                  Breathing stable
                 </button>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-[#B41A46] hover:bg-[#9a143a] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                className="w-full py-2.5 bg-[#B41A46] hover:bg-[#9a143a] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center cursor-pointer active:scale-98"
               >
-                <Send className="w-3.5 h-3.5" />
-                <span>Transmit to Unit</span>
+                Transmit Message
               </button>
             </form>
           </div>

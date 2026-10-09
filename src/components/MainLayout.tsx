@@ -1,5 +1,4 @@
 import React from 'react';
-import { Home as HomeIcon, MapPin, MessageSquare, User, Siren } from 'lucide-react';
 import { Tab } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserSettings } from '../lib/userSettings';
@@ -14,14 +13,13 @@ interface MainLayoutProps {
 interface NavTabItem {
   id: Tab;
   label: string;
-  icon: React.ElementType;
 }
 
 const NAV_ITEMS: NavTabItem[] = [
-  { id: 'home', label: 'Home', icon: HomeIcon },
-  { id: 'mapTab', label: 'Map', icon: MapPin },
-  { id: 'contacts', label: 'Contacts', icon: MessageSquare },
-  { id: 'profile', label: 'Profile', icon: User },
+  { id: 'home', label: 'Home' },
+  { id: 'mapTab', label: 'Map' },
+  { id: 'contacts', label: 'Contacts' },
+  { id: 'profile', label: 'Profile' },
 ];
 
 export default function MainLayout({ activeTab, onTabChange, onNavigate, children }: MainLayoutProps) {
@@ -32,29 +30,22 @@ export default function MainLayout({ activeTab, onTabChange, onNavigate, childre
   return (
     <div className="flex flex-col h-full bg-[#FAFAFA] dark:bg-neutral-950 font-sans overflow-hidden transition-colors">
       {/* Top Navigation Bar */}
-      <header className="shrink-0 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border-b border-neutral-200/80 dark:border-neutral-800 px-4 pt-3 pb-2.5 z-30 shadow-xs">
+      <header className="shrink-0 bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 px-4 py-2.5 z-30">
         <div className="max-w-md mx-auto flex items-center gap-2">
-          <nav className="flex-1 bg-neutral-100/90 dark:bg-neutral-800/90 p-1 rounded-2xl flex items-center gap-1 border border-neutral-200/60 dark:border-neutral-700/50">
+          <nav className="flex-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-xl flex items-center gap-1 border border-neutral-200/70 dark:border-neutral-700/60">
             {NAV_ITEMS.map((item) => {
               const isActive = activeTab === item.id;
-              const Icon = item.icon;
               return (
                 <button
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs transition-all duration-150 text-center ${
                     isActive
-                      ? 'bg-white dark:bg-neutral-900 text-[#B41A46] dark:text-rose-400 shadow-xs border border-neutral-200/50 dark:border-neutral-700/50'
-                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-white/40 dark:hover:bg-neutral-700/40'
+                      ? 'bg-white dark:bg-neutral-900 text-[#B41A46] dark:text-rose-400 font-bold shadow-xs border border-neutral-200/60 dark:border-neutral-700'
+                      : 'text-neutral-600 dark:text-neutral-400 font-medium hover:text-neutral-900 dark:hover:text-neutral-200'
                   }`}
                   aria-label={item.label}
                 >
-                  <Icon
-                    className={`w-4 h-4 shrink-0 transition-transform ${
-                      isActive ? 'scale-110 text-[#B41A46] dark:text-rose-400' : ''
-                    }`}
-                    strokeWidth={isActive ? 2.3 : 1.8}
-                  />
                   <span className="tracking-tight truncate">{item.label}</span>
                 </button>
               );
@@ -65,11 +56,10 @@ export default function MainLayout({ activeTab, onTabChange, onNavigate, childre
           {isResponder && onNavigate && (
             <button
               onClick={() => onNavigate('responder')}
-              className="py-2.5 px-3 bg-gradient-to-r from-blue-700 to-indigo-700 text-white rounded-2xl text-xs font-bold flex items-center gap-1.5 shadow-md hover:from-blue-800 hover:to-indigo-800 active:scale-95 transition-all cursor-pointer shrink-0"
+              className="py-1.5 px-3 bg-neutral-900 hover:bg-neutral-800 dark:bg-neutral-100 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 rounded-xl text-xs font-bold border border-neutral-800 dark:border-neutral-200 transition-all cursor-pointer shrink-0"
               title="Open Responder Mobile CAD"
             >
-              <Siren className="w-4 h-4 animate-pulse" />
-              <span className="hidden sm:inline">CAD Mobile</span>
+              CAD Terminal
             </button>
           )}
         </div>

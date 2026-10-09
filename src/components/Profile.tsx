@@ -8,28 +8,6 @@ import {
   addAllergyToCatalogInFirestore,
   DEFAULT_SYSTEM_ALLERGENS 
 } from '../lib/firebase';
-import { 
-  User as UserIcon, 
-  ChevronRight, 
-  X, 
-  PhoneCall, 
-  Shield, 
-  Copy, 
-  Check, 
-  LogOut, 
-  Camera, 
-  Upload, 
-  RotateCw, 
-  ZoomIn, 
-  ZoomOut, 
-  AlertCircle, 
-  Edit3, 
-  Trash2,
-  Calendar,
-  Heart,
-  Plus,
-  Search
-} from 'lucide-react';
 
 interface ProfileProps {
   onNavigate?: (screen: Screen | any) => void;
@@ -167,15 +145,14 @@ function ImageCropperModal({ imageSrc, onApplyCrop, onCancel }: ImageCropperModa
         
         {/* Header */}
         <div className="px-5 py-4 flex items-center justify-between border-b border-neutral-800">
-          <div className="flex items-center gap-2">
-            <Camera className="w-4 h-4 text-[#B41A46]" />
+          <div>
             <h3 className="font-semibold text-sm">Crop Profile Photo</h3>
           </div>
           <button 
             onClick={onCancel}
-            className="text-neutral-400 hover:text-white p-1 rounded-full hover:bg-neutral-800"
+            className="text-xs font-semibold text-neutral-400 hover:text-white px-2 py-1 cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            Cancel
           </button>
         </div>
 
@@ -228,10 +205,10 @@ function ImageCropperModal({ imageSrc, onApplyCrop, onCancel }: ImageCropperModa
               <button 
                 type="button"
                 onClick={() => handleZoomChange(zoom - 0.2)}
-                className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
+                className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold"
                 aria-label="Zoom out"
               >
-                <ZoomOut className="w-4 h-4" />
+                &minus;
               </button>
               
               <input
@@ -247,20 +224,19 @@ function ImageCropperModal({ imageSrc, onApplyCrop, onCancel }: ImageCropperModa
               <button 
                 type="button"
                 onClick={() => handleZoomChange(zoom + 0.2)}
-                className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
+                className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold"
                 aria-label="Zoom in"
               >
-                <ZoomIn className="w-4 h-4" />
+                +
               </button>
 
               <button 
                 type="button"
                 onClick={handleRotate}
-                className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 ml-1"
+                className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold ml-1 cursor-pointer"
                 title="Rotate 90 degrees"
-                aria-label="Rotate 90 degrees"
               >
-                <RotateCw className="w-4 h-4" />
+                Rotate
               </button>
             </div>
           </div>
@@ -271,17 +247,16 @@ function ImageCropperModal({ imageSrc, onApplyCrop, onCancel }: ImageCropperModa
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 py-2.5 px-3 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold transition-colors"
+            className="flex-1 py-2.5 px-3 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSaveCrop}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-[#B41A46] hover:bg-[#9a143a] text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+            className="flex-1 py-2.5 px-3 rounded-xl bg-[#B41A46] hover:bg-[#9a143a] text-white text-xs font-semibold transition-colors cursor-pointer"
           >
-            <Check className="w-3.5 h-3.5" />
-            <span>Apply Crop</span>
+            Apply Crop
           </button>
         </div>
 
@@ -320,13 +295,27 @@ export default function Profile({ onNavigate }: ProfileProps) {
   const [formContactRelation, setFormContactRelation] = useState(profile.emergencyContact?.relation || '');
   const [formContactPhone, setFormContactPhone] = useState(profile.emergencyContact?.phone || '');
 
-  const effectiveAvatarUrl = userProfile?.avatarUrl !== undefined ? (userProfile.avatarUrl || '') : (profile.avatarUrl || '');
+  // Effective user values scoped strictly to current authenticated account
+  const activeUserData = (currentUser && userProfile) ? userProfile : profile;
+  const effectiveAvatarUrl = currentUser 
+    ? (userProfile?.avatarUrl || '')
+    : (profile.avatarUrl || '');
+
+  const emergencyContact = currentUser
+    ? (userProfile?.emergencyContact?.name?.trim() ? userProfile.emergencyContact : { name: '', relation: '', phone: '' })
+    : (profile?.emergencyContact || { name: '', relation: '', phone: '' });
+  const hasEmergencyContact = Boolean(emergencyContact.name?.trim());
 
   // Photo & Cropper State
   const [avatarPreview, setAvatarPreview] = useState<string>(effectiveAvatarUrl);
   const [cropperRawSrc, setCropperRawSrc] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Sync avatarPreview when effectiveAvatarUrl updates
+  useEffect(() => {
+    setAvatarPreview(effectiveAvatarUrl);
+  }, [effectiveAvatarUrl]);
 
   // Dedicated Allergies & Reactions Modal State
   const [showAllergiesModal, setShowAllergiesModal] = useState(false);
@@ -364,34 +353,28 @@ export default function Profile({ onNavigate }: ProfileProps) {
   // Sync general form state when Edit Profile modal opens
   useEffect(() => {
     if (isEditModalOpen) {
-      setFormFullName(profile.fullName || '');
-      setFormDisplayName(profile.displayName || '');
-      setFormPhone(profile.phone || '');
-      setFormBirthdate(profile.birthdate || '1994-04-01');
-      setFormBloodType(profile.bloodType || 'O+');
-      setFormHeight(profile.heightCm || 180);
-      setFormWeight(profile.weightKg || 72);
-      setFormCity(profile.city || '');
-      setFormAddress(profile.address || '');
-      setFormContactName(profile.emergencyContact?.name || '');
-      setFormContactRelation(profile.emergencyContact?.relation || '');
-      setFormContactPhone(profile.emergencyContact?.phone || '');
+      setFormFullName(activeUserData.fullName || '');
+      setFormDisplayName(activeUserData.displayName || '');
+      setFormPhone(activeUserData.phone || '');
+      setFormBirthdate(activeUserData.birthdate || '1994-04-01');
+      setFormBloodType(activeUserData.bloodType || 'O+');
+      setFormHeight(activeUserData.heightCm || 180);
+      setFormWeight(activeUserData.weightKg || 72);
+      setFormCity((activeUserData as any).city || '');
+      setFormAddress((activeUserData as any).address || '');
+      setFormContactName(emergencyContact.name || '');
+      setFormContactRelation(emergencyContact.relation || '');
+      setFormContactPhone(emergencyContact.phone || '');
       setAvatarPreview(effectiveAvatarUrl);
       setPhotoError(null);
     }
-  }, [isEditModalOpen, profile, effectiveAvatarUrl]);
+  }, [isEditModalOpen, activeUserData, emergencyContact, effectiveAvatarUrl]);
 
   // Safe data fallbacks to prevent undefined access crashes
-  const allergies = Array.isArray(profile?.allergies) ? profile.allergies : [];
-  const chronicConditions = Array.isArray(profile?.chronicConditions) 
-    ? profile.chronicConditions 
-    : (profile?.chronicConditions ? [String(profile.chronicConditions)] : ['None Reported']);
-  const emergencyContact = profile?.emergencyContact || {
-    name: '',
-    relation: '',
-    phone: ''
-  };
-  const hasEmergencyContact = Boolean(emergencyContact.name?.trim());
+  const allergies = Array.isArray(activeUserData?.allergies) ? activeUserData.allergies : [];
+  const chronicConditions = Array.isArray((activeUserData as any)?.chronicConditions) 
+    ? (activeUserData as any).chronicConditions 
+    : ((activeUserData as any)?.chronicConditions ? [String((activeUserData as any).chronicConditions)] : ['None Reported']);
 
   const completionPct = typeof profile?.profileCompletionPct === 'number' 
     ? profile.profileCompletionPct 
@@ -627,8 +610,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
       
       {/* Toast Notification */}
       {saveSuccessToast && (
-        <div className="fixed top-18 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 animate-[fade-in_0.2s_ease-out]">
-          <Check className="w-4 h-4" />
+        <div className="fixed top-18 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-lg animate-[fade-in_0.2s_ease-out]">
           <span>Profile details updated successfully!</span>
         </div>
       )}
@@ -652,11 +634,10 @@ export default function Profile({ onNavigate }: ProfileProps) {
         <h2 className="text-xl font-medium text-gray-800 dark:text-neutral-200">Emergency Help Record</h2>
         <button
           onClick={() => setShowMedicalId(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-neutral-700 text-xs font-medium transition-all shadow-2xs cursor-pointer active:scale-95"
+          className="px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-neutral-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer active:scale-95"
           title="Open Medical ID Manifest"
         >
-          <Shield className="w-3.5 h-3.5 text-[#B41A46] dark:text-rose-400" />
-          <span>Medical ID</span>
+          Medical ID
         </button>
       </div>
 
@@ -668,7 +649,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
         title="Edit profile"
       >
         <div className="flex items-center min-w-0 mr-3">
-          {/* Avatar with photo or default icon */}
+          {/* Avatar with photo or default initial */}
           <div className="relative w-12 h-12 sm:w-14 sm:h-14 bg-[#F9E8EC] dark:bg-rose-950/50 rounded-2xl flex items-center justify-center mr-3.5 sm:mr-4 shrink-0 group-hover:scale-105 transition-transform overflow-hidden border border-rose-200/50 dark:border-rose-900/30">
             {effectiveAvatarUrl ? (
               <img 
@@ -677,7 +658,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <UserIcon className="w-6 h-6 sm:w-7 sm:h-7 text-[#B41A46] dark:text-rose-400" />
+              <span className="font-bold text-base text-[#B41A46] dark:text-rose-400">
+                {(profile.fullName || 'Citizen')[0].toUpperCase()}
+              </span>
             )}
           </div>
 
@@ -690,8 +673,8 @@ export default function Profile({ onNavigate }: ProfileProps) {
         </div>
 
         {/* Right Arrow */}
-        <div className="text-gray-300 dark:text-neutral-600 group-hover:text-[#B41A46] dark:group-hover:text-rose-400 transition-colors shrink-0 pl-2">
-          <ChevronRight className="w-5 h-5" />
+        <div className="text-gray-400 dark:text-neutral-500 group-hover:text-[#B41A46] dark:group-hover:text-rose-400 transition-colors shrink-0 pl-2 text-xs font-semibold">
+          Edit &rarr;
         </div>
       </div>
 
@@ -720,9 +703,6 @@ export default function Profile({ onNavigate }: ProfileProps) {
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3 sm:mb-4">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-sm sm:text-[15px] text-gray-900 dark:text-neutral-100">Allergies & Reactions</h3>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-[#B41A46] dark:text-rose-400 border border-rose-100 dark:border-rose-900/30">
-              {allergies.length} recorded
-            </span>
           </div>
           <button 
             type="button"
@@ -824,13 +804,12 @@ export default function Profile({ onNavigate }: ProfileProps) {
             await logout();
             onNavigate?.('login');
           }}
-          className={`w-full flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-2xl border text-sm font-semibold transition-all active:scale-[0.99] cursor-pointer ${
+          className={`w-full flex items-center justify-center py-3 px-4 rounded-xl border text-xs font-semibold transition-all active:scale-[0.99] cursor-pointer ${
             darkMode 
-              ? 'bg-rose-950/20 hover:bg-rose-950/40 border-rose-900/40 text-rose-300' 
-              : 'bg-white hover:bg-rose-50/70 border-rose-200/80 text-rose-600 shadow-[0_2px_10px_rgb(0,0,0,0.02)]'
+              ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300' 
+              : 'bg-white hover:bg-neutral-50 border-neutral-200 text-neutral-700'
           }`}
         >
-          <LogOut className="w-4 h-4 text-rose-600 dark:text-rose-400" />
           <span>Log Out</span>
         </button>
         <p className="text-center text-[11px] text-gray-400 dark:text-neutral-500 mt-2.5">
@@ -852,8 +831,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
             
             {/* Header */}
             <div className="px-6 py-4 flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800">
-              <div className="flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-[#B41A46] dark:text-rose-400" />
+              <div>
                 <h3 className="font-semibold text-base tracking-tight text-neutral-900 dark:text-neutral-100">
                   Edit Personal & Medical Profile
                 </h3>
@@ -861,10 +839,10 @@ export default function Profile({ onNavigate }: ProfileProps) {
               <button
                 type="button"
                 onClick={() => setIsEditModalOpen(false)}
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                className="text-xs font-semibold text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 px-2 py-1 cursor-pointer"
                 aria-label="Close edit profile"
               >
-                <X className="w-5 h-5" />
+                Close
               </button>
             </div>
 
@@ -887,7 +865,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <UserIcon className="w-9 h-9 text-[#B41A46] dark:text-rose-400" />
+                      <span className="font-bold text-xl text-[#B41A46] dark:text-rose-400">
+                        {(formFullName || profile.fullName || 'Citizen')[0].toUpperCase()}
+                      </span>
                     )}
                   </div>
 
@@ -906,20 +886,18 @@ export default function Profile({ onNavigate }: ProfileProps) {
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="px-3 py-1.5 bg-[#B41A46] hover:bg-[#9a143a] text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                        className="px-3 py-1.5 bg-[#B41A46] hover:bg-[#9a143a] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                       >
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>Upload & Crop</span>
+                        Upload & Crop
                       </button>
 
                       {avatarPreview && (
                         <button
                           type="button"
                           onClick={handleRemovePhoto}
-                          className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-gray-700 dark:text-neutral-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="px-3 py-1.5 bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-200 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Remove</span>
+                          Remove
                         </button>
                       )}
                     </div>
@@ -931,8 +909,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
                 </div>
 
                 {photoError && (
-                  <div className="mt-3 p-2.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 rounded-xl text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 animate-[fade-in_0.15s_ease-out]">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <div className="mt-3 p-2.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 rounded-xl text-rose-700 dark:text-rose-300 text-xs animate-[fade-in_0.15s_ease-out]">
                     <span>{photoError}</span>
                   </div>
                 )}
@@ -1131,10 +1108,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 px-4 rounded-xl bg-[#B41A46] hover:bg-[#9a143a] text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-3 px-4 rounded-xl bg-[#B41A46] hover:bg-[#9a143a] text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer text-center"
                 >
-                  <Check className="w-4 h-4" />
-                  <span>Save Profile</span>
+                  Save Profile
                 </button>
               </div>
 
@@ -1178,10 +1154,10 @@ export default function Profile({ onNavigate }: ProfileProps) {
               </div>
               <button
                 onClick={() => setShowMedicalId(false)}
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 px-2 py-1 text-xs font-semibold transition-colors cursor-pointer"
                 aria-label="Close medical ID"
               >
-                <X className="w-4 h-4" />
+                Close
               </button>
             </div>
 
@@ -1274,10 +1250,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
                 {hasEmergencyContact && emergencyContact.phone ? (
                   <a
                     href={`tel:${emergencyContact.phone}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-medium hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors shadow-2xs"
+                    className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
                   >
-                    <PhoneCall className="w-3.5 h-3.5 text-[#B41A46] dark:text-rose-400" />
-                    <span>Call</span>
+                    Call
                   </a>
                 ) : null}
               </div>
@@ -1288,25 +1263,15 @@ export default function Profile({ onNavigate }: ProfileProps) {
               <button
                 type="button"
                 onClick={handleCopyMedicalManifest}
-                className="flex-1 flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-xs font-medium hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors shadow-2xs cursor-pointer"
+                className="flex-1 py-2 px-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors cursor-pointer text-center"
               >
-                {copiedPass ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-emerald-600 dark:text-emerald-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5 text-neutral-400" />
-                    <span>Copy Details</span>
-                  </>
-                )}
+                {copiedPass ? 'Copied' : 'Copy Details'}
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowMedicalId(false)}
-                className="flex-1 py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-neutral-100 dark:hover:bg-white text-white dark:text-neutral-900 text-xs font-medium transition-colors shadow-2xs cursor-pointer"
+                className="flex-1 py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-neutral-100 dark:hover:bg-white text-white dark:text-neutral-900 text-xs font-semibold transition-colors cursor-pointer text-center"
               >
                 Done
               </button>
@@ -1333,24 +1298,18 @@ export default function Profile({ onNavigate }: ProfileProps) {
 
             {/* Modal Header */}
             <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-neutral-800 shrink-0">
-              <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center text-[#B41A46] dark:text-rose-400 shrink-0">
-                  <Shield className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-sm sm:text-base leading-tight truncate">Allergies & Medical Reactions</h3>
-                  <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">
-                    Verified medical catalog &bull; {firebaseAllergensList.length} allergens available
-                  </p>
-                </div>
+              <div className="min-w-0 pr-2">
+                <h3 className="font-bold text-sm sm:text-base leading-tight truncate">Allergies & Medical Reactions</h3>
+                <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">
+                  Verified medical catalog &bull; {firebaseAllergensList.length} allergens available
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAllergiesModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-neutral-200 w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer shrink-0"
-                aria-label="Close"
+                className="text-xs font-semibold text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 px-2 py-1 transition-colors cursor-pointer shrink-0"
               >
-                <X className="w-5 h-5" />
+                Close
               </button>
             </div>
 
@@ -1387,10 +1346,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
                           <button
                             type="button"
                             onClick={() => handleRemoveDraftAllergy(item.id)}
-                            className="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
-                            title="Remove allergy"
+                            className="text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 text-xs font-semibold px-2 py-1 transition-colors cursor-pointer shrink-0"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            Remove
                           </button>
                         </div>
 
@@ -1439,22 +1397,21 @@ export default function Profile({ onNavigate }: ProfileProps) {
                 </div>
 
                 {/* Instant Search Bar */}
-                <div className="relative">
-                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <div className="relative flex items-center">
                   <input
                     type="text"
                     value={allergySearchQuery}
                     onChange={(e) => setAllergySearchQuery(e.target.value)}
                     placeholder="Search penicillin, peanuts, latex, pollen, bee..."
-                    className="w-full pl-9 pr-9 py-2.5 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:border-[#B41A46]"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:border-[#B41A46]"
                   />
                   {allergySearchQuery && (
                     <button
                       type="button"
                       onClick={() => setAllergySearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 text-xs font-semibold text-gray-400 hover:text-gray-600"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      Clear
                     </button>
                   )}
                 </div>
@@ -1466,9 +1423,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
                       key={tab}
                       type="button"
                       onClick={() => setSelectedCategoryTab(tab)}
-                      className={`px-3 py-1.5 rounded-full font-semibold transition-all whitespace-nowrap text-xs cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap text-xs cursor-pointer ${
                         selectedCategoryTab === tab
-                          ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-2xs'
+                          ? 'bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'
                           : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-neutral-400 hover:bg-gray-200'
                       }`}
                     >
@@ -1490,10 +1447,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
                           setNewCustomAllergen(allergySearchQuery);
                           setShowAddCustomAllergy(true);
                         }}
-                        className="px-3 py-1.5 bg-[#B41A46] text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1 shadow-2xs active:scale-95"
+                        className="px-3 py-1.5 bg-[#B41A46] text-white text-xs font-semibold rounded-lg shadow-2xs active:scale-95"
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add "{allergySearchQuery}" to Catalog</span>
+                        Add "{allergySearchQuery}" to Catalog
                       </button>
                     </div>
                   ) : (
@@ -1505,18 +1461,13 @@ export default function Profile({ onNavigate }: ProfileProps) {
                             key={allergen}
                             type="button"
                             onClick={() => handleToggleDraftAllergy(allergen)}
-                            className={`px-2.5 py-2 sm:py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer active:scale-95 ${
                               isSelected
-                                ? 'bg-[#B41A46] text-white font-semibold shadow-2xs ring-1 ring-[#B41A46]'
+                                ? 'bg-[#B41A46] text-white font-semibold shadow-2xs'
                                 : 'bg-white dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 border border-gray-200 dark:border-neutral-700 hover:border-gray-300'
                             }`}
                           >
                             <span>{allergen}</span>
-                            {isSelected ? (
-                              <Check className="w-3 h-3 text-white" />
-                            ) : (
-                              <Plus className="w-3 h-3 text-gray-400" />
-                            )}
                           </button>
                         );
                       })}
@@ -1529,10 +1480,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
                   <button
                     type="button"
                     onClick={() => setShowAddCustomAllergy(true)}
-                    className="w-full py-2.5 px-3 rounded-xl border border-dashed border-gray-300 dark:border-neutral-700 hover:border-[#B41A46] bg-gray-50/50 dark:bg-neutral-800/40 text-gray-700 dark:text-neutral-300 hover:text-[#B41A46] text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                    className="w-full py-2.5 px-3 rounded-xl border border-dashed border-gray-300 dark:border-neutral-700 hover:border-[#B41A46] bg-gray-50/50 dark:bg-neutral-800/40 text-gray-700 dark:text-neutral-300 hover:text-[#B41A46] text-xs font-semibold transition-all flex items-center justify-center cursor-pointer active:scale-98"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Not in list? Add Custom Allergy</span>
+                    Not in list? Add Custom Allergy
                   </button>
                 ) : (
                   <div className="p-3 sm:p-3.5 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 rounded-2xl space-y-2.5 animate-[fade-in_0.15s_ease-out]">
@@ -1543,9 +1493,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
                       <button
                         type="button"
                         onClick={() => setShowAddCustomAllergy(false)}
-                        className="text-gray-400 hover:text-gray-600 dark:hover:text-neutral-200 w-7 h-7 flex items-center justify-center"
+                        className="text-xs font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-neutral-200 px-2 py-1"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        Cancel
                       </button>
                     </div>
 
@@ -1586,10 +1536,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
                       type="button"
                       onClick={handleSaveCustomAllergyToCatalog}
                       disabled={!newCustomAllergen.trim()}
-                      className="w-full py-2.5 bg-[#B41A46] hover:bg-[#9a143a] disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-2xs active:scale-98"
+                      className="w-full py-2.5 bg-[#B41A46] hover:bg-[#9a143a] disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center justify-center shadow-2xs active:scale-98"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Save & Add to Catalog</span>
+                      Save & Add to Catalog
                     </button>
                   </div>
                 )}
@@ -1608,10 +1557,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
               <button
                 type="button"
                 onClick={handleSaveAllergiesModal}
-                className="flex-1 sm:flex-initial px-5 py-2.5 bg-[#B41A46] hover:bg-[#9a143a] text-white text-xs font-bold rounded-xl transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 text-center"
+                className="flex-1 sm:flex-initial px-5 py-2.5 bg-[#B41A46] hover:bg-[#9a143a] text-white text-xs font-bold rounded-xl transition-all shadow-2xs cursor-pointer flex items-center justify-center active:scale-95 text-center"
               >
-                <Check className="w-3.5 h-3.5" />
-                <span>Save & Sync</span>
+                Save & Sync
               </button>
             </div>
           </div>

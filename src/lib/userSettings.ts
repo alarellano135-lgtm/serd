@@ -87,6 +87,19 @@ export interface AppSettings {
   darkMode: boolean;
 }
 
+export function getUserStorageKey(uid?: string | null): string {
+  if (uid && typeof uid === 'string' && uid.trim()) {
+    return `serd_app_settings_${uid.trim()}`;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const activeUid = localStorage.getItem('serd_active_auth_uid');
+      if (activeUid) return `serd_app_settings_${activeUid}`;
+    } catch {}
+  }
+  return 'serd_app_settings_guest';
+}
+
 const STORAGE_KEY = 'serd_app_settings_v1';
 const SETTINGS_EVENT = 'serd-settings-changed';
 
@@ -240,10 +253,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   darkMode: false
 };
 
-export function loadSettings(): AppSettings {
+export function loadSettings(uid?: string | null): AppSettings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const key = getUserStorageKey(uid);
+    const raw = localStorage.getItem(key) || (key === 'serd_app_settings_guest' ? localStorage.getItem(STORAGE_KEY) : null);
     if (!raw) {
       const computedPct = calculateProfileCompletion(DEFAULT_SETTINGS.profile);
       return {
@@ -260,7 +274,9 @@ export function loadSettings(): AppSettings {
     mergedProfile.chronicConditions = Array.isArray(mergedProfile.chronicConditions) 
       ? mergedProfile.chronicConditions 
       : (DEFAULT_SETTINGS.profile.chronicConditions || []);
-    mergedProfile.emergencyContact = mergedProfile.emergencyContact || DEFAULT_SETTINGS.profile.emergencyContact;
+    mergedProfile.emergencyContact = (parsed?.profile?.emergencyContact?.name?.trim())
+      ? parsed.profile.emergencyContact
+      : { name: '', relation: '', phone: '' };
     if (Array.isArray(parsed?.profile?.emergencyCircle)) {
       mergedProfile.emergencyCircle = parsed.profile.emergencyCircle;
     } else if (mergedProfile.emergencyContact?.name?.trim()) {
@@ -292,10 +308,14 @@ export function loadSettings(): AppSettings {
   }
 }
 
-export function saveSettings(settings: AppSettings): void {
+export function saveSettings(settings: AppSettings, uid?: string | null): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    const key = getUserStorageKey(uid);
+    localStorage.setItem(key, JSON.stringify(settings));
+    if (key !== STORAGE_KEY) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch {}
+    }
     // Defer event dispatch to next tick to avoid synchronous setState during active React render phases
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent(SETTINGS_EVENT, { detail: settings }));
@@ -305,12 +325,12 @@ export function saveSettings(settings: AppSettings): void {
   }
 }
 
-export function getStoredProfile(): UserProfile {
-  return loadSettings().profile;
+export function getStoredProfile(uid?: string | null): UserProfile {
+  return loadSettings(uid).profile;
 }
 
-export function updateStoredProfile(profilePartial: Partial<UserProfile>): void {
-  const current = loadSettings();
+export function updateStoredProfile(profilePartial: Partial<UserProfile>, uid?: string | null): void {
+  const current = loadSettings(uid);
   const mergedProfile = { ...current.profile, ...profilePartial };
   if (!Array.isArray(mergedProfile.allergies)) {
     mergedProfile.allergies = [];
@@ -320,7 +340,22 @@ export function updateStoredProfile(profilePartial: Partial<UserProfile>): void 
   }
   mergedProfile.profileCompletionPct = calculateProfileCompletion(mergedProfile);
   const next: AppSettings = { ...current, profile: mergedProfile };
-  saveSettings(next);
+  saveSettings(next, uid);
+}
+
+export function clearAllUserSettings(uid?: string | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (uid) {
+      localStorage.removeItem(`serd_app_settings_${uid}`);
+      localStorage.removeItem(`serd_user_profile_${uid}`);
+    }
+    localStorage.removeItem('serd_active_auth_uid');
+    localStorage.removeItem('serd_app_settings_guest');
+    localStorage.removeItem('serd_app_settings_v1');
+    localStorage.removeItem('serd_app_settings');
+    saveSettings(DEFAULT_SETTINGS);
+  } catch {}
 }
 
 export function applyTheme(darkMode: boolean): void {
@@ -344,7 +379,7 @@ export function useUserSettings() {
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY) {
+      if (e.key === STORAGE_KEY || (e.key && e.key.startsWith('serd_app_settings'))) {
         const updated = loadSettings();
         setSettingsState(updated);
         applyTheme(updated.darkMode);

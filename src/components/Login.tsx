@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AlertCircle, Loader2 } from 'lucide-react';
 
 interface LoginProps {
   onNavigate: (screen: 'signup' | 'main' | 'responder') => void;
@@ -41,47 +40,55 @@ export default function Login({ onNavigate }: LoginProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full bg-white px-6 py-12 relative overflow-y-auto font-sans">
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm mx-auto">
-        <h1 className="text-5xl text-[#B41A46] mb-3 tracking-tighter font-bold">SERD.</h1>
-        <p className="text-gray-500 text-sm mb-8 font-medium tracking-wide">Smart Emergency Response Dispatch</p>
+        <h1 className="text-4xl text-[#B41A46] mb-2 tracking-tight font-bold">SERD</h1>
+        <p className="text-neutral-500 text-xs mb-8 font-medium tracking-wide">Emergency Response Dispatch</p>
 
         {error && (
-          <div className="w-full mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div className="flex-1 leading-relaxed">
-              <span>{error}</span>
-            </div>
+          <div className="w-full mb-4 p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-rose-700 leading-relaxed">
+            {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="w-full space-y-4">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            className="w-full px-5 py-4 bg-gray-50/50 border border-gray-100 rounded-2xl focus:outline-none focus:bg-white focus:border-[#B41A46]/20 focus:ring-4 focus:ring-[#B41A46]/5 text-gray-900 transition-all font-medium placeholder:text-gray-400"
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            className="w-full px-5 py-4 bg-gray-50/50 border border-gray-100 rounded-2xl focus:outline-none focus:bg-white focus:border-[#B41A46]/20 focus:ring-4 focus:ring-[#B41A46]/5 text-gray-900 transition-all font-medium placeholder:text-gray-400"
-          />
+        <form onSubmit={handleSubmit} className="w-full space-y-3">
+          <div>
+            <label className="block text-[11px] font-semibold text-neutral-600 uppercase tracking-wider mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
+              className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#B41A46] text-neutral-900 transition-colors text-sm font-medium placeholder:text-neutral-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-neutral-600 uppercase tracking-wider mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#B41A46] text-neutral-900 transition-colors text-sm font-medium placeholder:text-neutral-400"
+            />
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-6 bg-[#B41A46] text-white font-semibold py-4 rounded-2xl shadow-[0_8px_20px_rgb(180,26,70,0.25)] hover:shadow-[0_12px_25px_rgb(180,26,70,0.35)] hover:bg-[#9a143a] transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+            className="w-full mt-4 bg-[#B41A46] hover:bg-[#9a143a] text-white font-semibold py-3 px-4 rounded-xl text-sm transition-colors cursor-pointer text-center disabled:opacity-50"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'LOG IN'}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <p className="mt-6 text-sm text-gray-500">
+        <p className="mt-6 text-xs text-neutral-500">
           Don't have an account?{' '}
-          <button onClick={() => onNavigate('signup')} className="text-[#B41A46] font-medium hover:underline cursor-pointer">
-            Sign up
+          <button onClick={() => onNavigate('signup')} className="text-[#B41A46] font-semibold hover:underline cursor-pointer">
+            Create account
           </button>
         </p>
       </div>

@@ -1,20 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  User, 
-  Plus, 
-  X, 
-  PhoneCall, 
-  MessageSquare, 
-  Star, 
-  Trash2, 
-  Edit2, 
-  Search, 
-  Shield, 
-  Smartphone, 
-  Check, 
-  AlertCircle,
-  Phone
-} from 'lucide-react';
 import { Screen } from '../types';
 import { useUserSettings, EmergencyCircleContact } from '../lib/userSettings';
 import { useAuth } from '../contexts/AuthContext';
@@ -261,8 +245,7 @@ export default function Contacts({ onNavigate }: ContactsProps) {
       
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 animate-[fade-in_0.15s_ease-out]">
-          <Check className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs font-semibold px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-[fade-in_0.15s_ease-out]">
           <span>{toastMessage}</span>
         </div>
       )}
@@ -270,63 +253,54 @@ export default function Contacts({ onNavigate }: ContactsProps) {
       {/* Header & Action Bar */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-neutral-500">
+          <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
             Emergency Circle ({contacts.length})
           </span>
-          <p className="text-[11px] text-gray-400 dark:text-neutral-500 mt-0.5">
+          <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5">
             Contacts notified and reachable during an emergency
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {isContactPickerSupported && (
             <button
               onClick={handleImportDeviceContact}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-gray-700 dark:text-neutral-300 text-xs font-semibold shadow-2xs hover:bg-gray-50 active:scale-95 transition-all"
-              title="Import contact from phone address book"
-              aria-label="Import from Phone"
+              className="px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 text-xs font-semibold hover:bg-neutral-50 transition-colors"
             >
-              <Smartphone className="w-3.5 h-3.5 text-[#B41A46]" />
-              <span className="hidden sm:inline">Import</span>
+              Import
             </button>
           )}
 
           <button
             id="add-contact-btn"
             onClick={handleOpenAddModal}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#B41A46] text-white text-xs font-semibold shadow-xs hover:bg-[#9a143a] active:scale-95 transition-all cursor-pointer"
-            title="Add Emergency Contact"
-            aria-label="Add Contact"
+            className="px-3 py-1.5 rounded-lg bg-[#B41A46] text-white text-xs font-semibold hover:bg-[#9a143a] transition-colors cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Contact</span>
+            Add Contact
           </button>
         </div>
       </div>
 
-
-
       {/* Search Bar (Shown when multiple contacts exist) */}
       {contacts.length > 2 && (
-        <div className="relative mb-3.5 px-1">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <div className="relative mb-3.5 px-1 flex items-center">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search contacts by name or relationship..."
-            className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs font-medium border focus:outline-none focus:border-[#B41A46] ${
+            placeholder="Search contacts..."
+            className={`w-full px-3 py-2 rounded-xl text-xs font-medium border focus:outline-none focus:border-[#B41A46] ${
               darkMode 
                 ? 'bg-neutral-900 border-neutral-800 text-white placeholder:text-neutral-500' 
-                : 'bg-white border-gray-200 text-gray-900 placeholder:text-gray-400'
+                : 'bg-white border-neutral-200 text-neutral-900 placeholder:text-neutral-400'
             }`}
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 text-xs font-semibold text-neutral-400 hover:text-neutral-600"
             >
-              <X className="w-3.5 h-3.5" />
+              Clear
             </button>
           )}
         </div>
@@ -337,40 +311,35 @@ export default function Contacts({ onNavigate }: ContactsProps) {
         {contacts.length === 0 ? (
           /* Clean Empty State */
           <div className={`p-8 text-center rounded-2xl border border-dashed my-4 ${
-            darkMode ? 'bg-neutral-900/40 border-neutral-800' : 'bg-white border-gray-200'
+            darkMode ? 'bg-neutral-900/40 border-neutral-800' : 'bg-white border-neutral-200'
           }`}>
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center mx-auto mb-3 text-[#B41A46] dark:text-rose-400">
-              <Shield className="w-6 h-6" />
-            </div>
-            <h3 className="font-bold text-sm text-gray-900 dark:text-white mb-1">
-              No Emergency Contacts Yet
+            <h3 className="font-bold text-sm text-neutral-900 dark:text-white mb-1">
+              No Emergency Contacts
             </h3>
-            <p className="text-xs text-gray-500 dark:text-neutral-400 max-w-xs mx-auto mb-5 leading-relaxed">
-              Add trusted family members or friends who will be notified and directly reachable if you trigger an emergency alert.
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-xs mx-auto mb-5 leading-relaxed">
+              Add trusted family members or friends who will be notified and directly reachable during emergencies.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
               <button
                 onClick={handleOpenAddModal}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#B41A46] hover:bg-[#9a143a] text-white text-xs font-bold transition-all shadow-xs active:scale-95 inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#B41A46] hover:bg-[#9a143a] text-white text-xs font-semibold transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add First Contact</span>
+                Add Contact
               </button>
 
               {isContactPickerSupported && (
                 <button
                   onClick={handleImportDeviceContact}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 text-xs font-semibold hover:bg-gray-50 active:scale-95 inline-flex items-center justify-center gap-1.5"
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-xs font-semibold hover:bg-neutral-50"
                 >
-                  <Smartphone className="w-3.5 h-3.5 text-[#B41A46]" />
-                  <span>Import from Phone</span>
+                  Import from Phone
                 </button>
               )}
             </div>
           </div>
         ) : filteredContacts.length === 0 ? (
           /* Search Empty State */
-          <div className="p-8 text-center text-xs text-gray-400 dark:text-neutral-500">
+          <div className="p-8 text-center text-xs text-neutral-400 dark:text-neutral-500">
             No contacts found matching "{searchQuery}".
           </div>
         ) : (
@@ -378,91 +347,71 @@ export default function Contacts({ onNavigate }: ContactsProps) {
           filteredContacts.map((contact) => (
             <div 
               key={contact.id} 
-              className={`p-4 rounded-2xl border shadow-[0_2px_10px_rgb(0,0,0,0.03)] transition-all ${
+              className={`p-4 rounded-xl border transition-all ${
                 darkMode 
-                  ? 'bg-neutral-900 border-neutral-800 hover:border-neutral-700' 
-                  : 'bg-white border-gray-100 hover:border-gray-200'
-              } ${contact.isPrimary ? 'ring-1 ring-[#B41A46]/20' : ''}`}
+                  ? 'bg-neutral-900 border-neutral-800' 
+                  : 'bg-white border-neutral-200/80'
+              } ${contact.isPrimary ? 'border-neutral-300 dark:border-neutral-700' : ''}`}
             >
               <div className="flex items-start justify-between gap-3">
-                {/* Avatar Icon */}
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                  contact.isPrimary
-                    ? 'bg-[#B41A46] text-white'
-                    : 'bg-[#F9E8EC] dark:bg-rose-950/40 text-[#B41A46] dark:text-rose-400'
-                }`}>
-                  <User className="w-5 h-5 fill-current" />
-                </div>
-
                 {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-[14px] text-gray-900 dark:text-white truncate">
+                    <h3 className="font-bold text-sm text-neutral-900 dark:text-white truncate">
                       {contact.name}
                     </h3>
                     {contact.isPrimary && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/50 text-[#B41A46] dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40">
-                        <Star className="w-2.5 h-2.5 fill-current" />
-                        <span>Primary</span>
+                      <span className="text-[10px] font-bold text-[#B41A46] dark:text-rose-400">
+                        Primary
                       </span>
                     )}
                   </div>
 
-                  <p className="text-gray-500 dark:text-neutral-400 text-xs mt-0.5 font-medium tracking-wide">
+                  <p className="text-neutral-600 dark:text-neutral-400 text-xs mt-0.5 font-mono">
                     {contact.phone}
                   </p>
 
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[11px] font-semibold text-gray-400 dark:text-neutral-500">
-                      {contact.relation || 'Emergency Contact'}
-                    </span>
+                  <div className="flex items-center gap-2 mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                    <span>{contact.relation || 'Emergency Contact'}</span>
                     {contact.notes && (
-                      <span className="text-[10px] text-gray-400 dark:text-neutral-500 truncate max-w-[150px]">
-                        &bull; {contact.notes}
+                      <span className="truncate max-w-[150px]">
+                        &middot; {contact.notes}
                       </span>
                     )}
                   </div>
                 </div>
 
                 {/* Direct Action Buttons */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {/* Emergency SMS */}
+                <div className="flex items-center gap-2 shrink-0">
                   <a
                     href={getEmergencySmsUrl(contact)}
-                    className="w-9 h-9 rounded-xl bg-gray-50 dark:bg-neutral-800 text-gray-600 dark:text-neutral-300 flex items-center justify-center hover:bg-rose-50 hover:text-[#B41A46] dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors shadow-2xs active:scale-95"
-                    title={`Send SOS SMS to ${contact.name}`}
-                    aria-label={`Send SMS to ${contact.name}`}
+                    className="px-2.5 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 text-xs font-semibold hover:border-neutral-300 transition-colors"
                   >
-                    <MessageSquare className="w-4 h-4" />
+                    SMS
                   </a>
 
-                  {/* Phone Call */}
                   <a
                     href={`tel:${contact.phone}`}
-                    className="w-9 h-9 rounded-xl bg-[#B41A46] text-white flex items-center justify-center hover:bg-[#9a143a] transition-colors shadow-2xs active:scale-95"
-                    title={`Call ${contact.name}`}
-                    aria-label={`Call ${contact.name}`}
+                    className="px-2.5 py-1.5 rounded-lg bg-[#B41A46] text-white text-xs font-semibold hover:bg-[#9a143a] transition-colors"
                   >
-                    <PhoneCall className="w-4 h-4" />
+                    Call
                   </a>
                 </div>
               </div>
 
               {/* Management Controls Footer */}
-              <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-neutral-800 flex items-center justify-between text-xs">
+              <div className="mt-3 pt-2.5 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs">
                 <div>
                   {!contact.isPrimary ? (
                     <button
                       onClick={() => handleSetPrimary(contact.id)}
-                      className="text-[11px] font-semibold text-gray-400 hover:text-[#B41A46] dark:hover:text-rose-400 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                      className="text-[11px] font-semibold text-neutral-500 hover:text-[#B41A46] dark:hover:text-rose-400 transition-colors cursor-pointer"
                     >
-                      <Star className="w-3 h-3" />
-                      <span>Set as Primary</span>
+                      Make Primary
                     </button>
                   ) : (
-                    <span className="text-[11px] text-[#B41A46] dark:text-rose-400 font-semibold inline-flex items-center gap-1">
-                      <Check className="w-3 h-3" />
-                      <span>Main Medical Contact</span>
+                    <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+                      Primary Contact
                     </span>
                   )}
                 </div>
@@ -470,18 +419,16 @@ export default function Contacts({ onNavigate }: ContactsProps) {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => handleOpenEditModal(contact)}
-                    className="text-[11px] font-medium text-gray-400 hover:text-gray-700 dark:hover:text-neutral-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors cursor-pointer"
                   >
-                    <Edit2 className="w-3 h-3" />
-                    <span>Edit</span>
+                    Edit
                   </button>
 
                   <button
                     onClick={() => setDeleteConfirmId(contact.id)}
-                    className="text-[11px] font-medium text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-medium text-neutral-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
                   >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Delete</span>
+                    Delete
                   </button>
                 </div>
               </div>
@@ -493,26 +440,25 @@ export default function Contacts({ onNavigate }: ContactsProps) {
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-[fade-in_0.15s_ease-out]">
-          <div className={`${darkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-gray-100 text-gray-900'} w-full max-w-sm rounded-2xl p-6 shadow-2xl border space-y-4`}>
-            <div className="flex items-center gap-2.5 text-rose-600">
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              <h3 className="font-bold text-sm">Remove Emergency Contact?</h3>
+          <div className={`${darkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'} w-full max-w-sm rounded-2xl p-6 shadow-2xl border space-y-4`}>
+            <div>
+              <h3 className="font-bold text-sm text-neutral-900 dark:text-white">Remove Emergency Contact</h3>
             </div>
-            <p className="text-xs text-gray-500 dark:text-neutral-400 leading-relaxed">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
               Are you sure you want to remove this contact from your emergency circle? They will no longer be notified during an incident.
             </p>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setDeleteConfirmId(null)}
-                className="px-3.5 py-2 rounded-xl border border-gray-200 dark:border-neutral-700 text-xs font-semibold hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+                className="px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => handleDeleteContact(deleteConfirmId)}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shadow-2xs"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors"
               >
                 Remove Contact
               </button>
@@ -524,38 +470,29 @@ export default function Contacts({ onNavigate }: ContactsProps) {
       {/* Add / Edit Contact Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-[fade-in_0.15s_ease-out]">
-          <div className={`${darkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-gray-100 text-gray-900'} w-full sm:max-w-md rounded-t-[28px] sm:rounded-3xl p-6 sm:p-7 shadow-2xl border-t sm:border relative max-h-[92vh] overflow-y-auto`}>
-            
-            {/* Mobile Drag Indicator Handle */}
-            <div className="w-10 h-1 bg-gray-300 dark:bg-neutral-700 rounded-full mx-auto -mt-2 mb-4 sm:hidden"></div>
-
+          <div className={`${darkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-neutral-200 text-neutral-900'} w-full sm:max-w-md rounded-t-[28px] sm:rounded-2xl p-6 shadow-2xl border-t sm:border relative max-h-[92vh] overflow-y-auto`}>
             <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center text-[#B41A46]">
-                  <User className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold leading-tight">
-                    {editingContact ? 'Edit Emergency Contact' : 'Add Emergency Contact'}
-                  </h2>
-                  <p className="text-[11px] text-gray-400">
-                    Trusted person in your safety circle
-                  </p>
-                </div>
+              <div>
+                <h2 className="text-base font-bold leading-tight">
+                  {editingContact ? 'Edit Emergency Contact' : 'Add Emergency Contact'}
+                </h2>
+                <p className="text-[11px] text-neutral-400">
+                  Trusted contact for dispatch alerts
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'text-neutral-400 hover:text-white bg-neutral-800' : 'text-gray-400 hover:text-gray-900 bg-gray-100'}`}
+                className="text-xs font-semibold text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 px-2 py-1"
               >
-                <X className="w-4 h-4" />
+                Close
               </button>
             </div>
 
             <form onSubmit={handleSaveContact} className="space-y-4">
               {/* Full Name */}
               <div>
-                <label className="block text-xs font-bold tracking-wider uppercase text-gray-500 dark:text-neutral-400 mb-1.5">
+                <label className="block text-xs font-bold tracking-wider uppercase text-neutral-500 dark:text-neutral-400 mb-1.5">
                   Full Name <span className="text-[#B41A46]">*</span>
                 </label>
                 <input
@@ -564,42 +501,39 @@ export default function Contacts({ onNavigate }: ContactsProps) {
                   placeholder="e.g. Maria Santos"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className={`w-full px-4 py-3 border rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#B41A46] font-medium ${
-                    darkMode ? 'bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500' : 'bg-gray-50/50 border-gray-200 text-gray-900 placeholder:text-gray-400'
+                  className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#B41A46] font-medium ${
+                    darkMode ? 'bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500' : 'bg-neutral-50 border-neutral-200 text-neutral-900 placeholder:text-neutral-400'
                   }`}
                 />
               </div>
 
               {/* Phone Number */}
               <div>
-                <label className="block text-xs font-bold tracking-wider uppercase text-gray-500 dark:text-neutral-400 mb-1.5">
+                <label className="block text-xs font-bold tracking-wider uppercase text-neutral-500 dark:text-neutral-400 mb-1.5">
                   Phone Number <span className="text-[#B41A46]">*</span>
                 </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="tel"
-                    required
-                    placeholder="e.g. +63 917 123 4567"
-                    value={formPhone}
-                    onChange={(e) => setFormPhone(e.target.value)}
-                    className={`w-full pl-9 pr-4 py-3 border rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#B41A46] font-medium ${
-                      darkMode ? 'bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500' : 'bg-gray-50/50 border-gray-200 text-gray-900 placeholder:text-gray-400'
-                    }`}
-                  />
-                </div>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. +63 917 123 4567"
+                  value={formPhone}
+                  onChange={(e) => setFormPhone(e.target.value)}
+                  className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#B41A46] font-medium ${
+                    darkMode ? 'bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500' : 'bg-neutral-50 border-neutral-200 text-neutral-900 placeholder:text-neutral-400'
+                  }`}
+                />
               </div>
 
               {/* Relationship Dropdown */}
               <div>
-                <label className="block text-xs font-bold tracking-wider uppercase text-gray-500 dark:text-neutral-400 mb-1.5">
+                <label className="block text-xs font-bold tracking-wider uppercase text-neutral-500 dark:text-neutral-400 mb-1.5">
                   Relationship
                 </label>
                 <select
                   value={formRelation}
                   onChange={(e) => setFormRelation(e.target.value)}
-                  className={`w-full px-4 py-3 border rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#B41A46] font-medium ${
-                    darkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-gray-50/50 border-gray-200 text-gray-900'
+                  className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#B41A46] font-medium ${
+                    darkMode ? 'bg-neutral-800 border-neutral-700 text-white' : 'bg-neutral-50 border-neutral-200 text-neutral-900'
                   }`}
                 >
                   {RELATIONSHIP_OPTIONS.map((rel) => (
@@ -610,22 +544,22 @@ export default function Contacts({ onNavigate }: ContactsProps) {
 
               {/* Notes or Instructions */}
               <div>
-                <label className="block text-xs font-bold tracking-wider uppercase text-gray-500 dark:text-neutral-400 mb-1.5">
+                <label className="block text-xs font-bold tracking-wider uppercase text-neutral-500 dark:text-neutral-400 mb-1.5">
                   Emergency Notes (Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Has spare house keys, lives 5 mins away"
+                  placeholder="e.g. Has spare keys, lives nearby"
                   value={formNotes}
                   onChange={(e) => setFormNotes(e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:outline-none focus:border-[#B41A46] font-medium ${
-                    darkMode ? 'bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500' : 'bg-gray-50/50 border-gray-200 text-gray-900 placeholder:text-gray-400'
+                  className={`w-full px-3.5 py-2.5 border rounded-xl text-xs focus:outline-none focus:border-[#B41A46] font-medium ${
+                    darkMode ? 'bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500' : 'bg-neutral-50 border-neutral-200 text-neutral-900 placeholder:text-neutral-400'
                   }`}
                 />
               </div>
 
               {/* Primary Contact Checkbox */}
-              <label className="flex items-start gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-neutral-800 bg-gray-50/40 dark:bg-neutral-800/40 cursor-pointer">
+              <label className="flex items-start gap-2.5 p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formIsPrimary}
@@ -633,10 +567,10 @@ export default function Contacts({ onNavigate }: ContactsProps) {
                   className="mt-0.5 w-4 h-4 accent-[#B41A46] rounded cursor-pointer"
                 />
                 <div>
-                  <span className="text-xs font-bold text-gray-900 dark:text-white block">
+                  <span className="text-xs font-bold text-neutral-900 dark:text-white block">
                     Set as Primary Emergency Contact
                   </span>
-                  <span className="text-[11px] text-gray-500 dark:text-neutral-400 leading-tight block mt-0.5">
+                  <span className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight block mt-0.5">
                     Will be synced to your Medical ID and given first priority during dispatch alerts.
                   </span>
                 </div>
@@ -647,13 +581,13 @@ export default function Contacts({ onNavigate }: ContactsProps) {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="flex-1 py-3.5 rounded-xl border border-gray-200 dark:border-neutral-700 text-xs font-semibold text-gray-700 dark:text-neutral-300 hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+                  className="flex-1 py-3 rounded-xl border border-neutral-200 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3.5 rounded-xl bg-[#B41A46] hover:bg-[#9a143a] text-white font-bold text-xs sm:text-sm transition-all shadow-sm active:scale-95"
+                  className="flex-1 py-3 rounded-xl bg-[#B41A46] hover:bg-[#9a143a] text-white font-bold text-xs sm:text-sm transition-colors cursor-pointer"
                 >
                   {editingContact ? 'Save Changes' : 'Add to Circle'}
                 </button>
